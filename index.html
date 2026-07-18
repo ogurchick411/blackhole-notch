@@ -22,14 +22,22 @@
       transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
     .notch:hover {
-      width: 350px;
-      height: 65px;
-      border-bottom-left-radius: 24px;
-      border-bottom-right-radius: 24px;
+      width: 540px;   
+      height: 130px;  
+      border-bottom-left-radius: 32px;
+      border-bottom-right-radius: 32px;
     }
   </style>
 </head>
 <body>
   <div class="notch"></div>
+  <script>
+    const { ipcRenderer } = require('electron');
+    const notch = document.querySelector('.notch');
+
+    notch.addEventListener('mouseenter', () => {
+        ipcRenderer.send('trigger-haptic');
+    });
+  </script>
 </body>
 </html>

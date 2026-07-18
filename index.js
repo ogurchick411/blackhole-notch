@@ -39,3 +39,12 @@ app.whenReady().then(createNotchWindow);
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
+
+const { ipcMain, systemPreferences } = require('electron');
+
+ipcMain.on('trigger-haptic', () => {
+     
+    if (process.platform === 'darwin' && systemPreferences.vibrateHW) {
+        systemPreferences.vibrateHW([0]); 
+    }
+});
