@@ -27,6 +27,7 @@ function createNotchWindow() {
 
     mainWindow.setAlwaysOnTop(true, 'screen-saver');
     mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    mainWindow.setIgnoreMouseEvents(true, { forward: true });
 
     mainWindow.loadFile('index.html');
 }
