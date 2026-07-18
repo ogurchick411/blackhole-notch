@@ -4,10 +4,13 @@ let mainWindow
 
 function createNotchWindow() {
     const primaryDisplay = screen.getPrimaryDisplay();
-    const { width } = primaryDisplay.bounds;
+    const { width, height } = primaryDisplay.bounds;
+    const { y: workAreaY } = primaryDisplay.workArea;
+
+    const notchHeight = workAreaY; 
 
     const windowWidth = 500;
-    const windowHeight = 120;
+    const windowHeight = 150;
 
     mainWindow = new BrowserWindow({
         width: windowWidth,
@@ -22,7 +25,6 @@ function createNotchWindow() {
         enableLargerThanScreen: true,
         type: 'panel',
         hiddenInMissionControl: true,
-        titleBarStyle: 'customButtonsOnHover'
     });
 
     mainWindow.setAlwaysOnTop(true, 'screen-saver');
