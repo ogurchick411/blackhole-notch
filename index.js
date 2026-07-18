@@ -6,8 +6,8 @@ function createNotchWindow() {
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width } = primaryDisplay.bounds;
 
-    const notchWidth = 500;
-    const notchHeight = 120;
+    const windowWidth = 500;
+    const windowHeight = 120;
 
     mainWindow = new BrowserWindow({
         width: windowWidth,
