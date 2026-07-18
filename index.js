@@ -6,13 +6,13 @@ function createNotchWindow() {
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width } = primaryDisplay.bounds;
 
-    const notchWidth = 270;
-    const notchHeight = 38;
+    const notchWidth = 500;
+    const notchHeight = 120;
 
     mainWindow = new BrowserWindow({
-        width: notchWidth,
-        height: notchHeight,
-        x: Math.floor((width - notchWidth) / 2),
+        width: windowWidth,
+        height: windowHeight,
+        x: Math.floor((width - windowWidth) / 2),
         y: 0,
         frame: false,
         transparent: true,
@@ -28,7 +28,7 @@ function createNotchWindow() {
     mainWindow.setAlwaysOnTop(true, 'screen-saver');
     mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
-    mainWindow.loadURL('data:text/html,<html><body style="background:black; margin:0;"></body></html>');
+    mainWindow.loadFile('index.html');
 }
 
 app.whenReady().then(createNotchWindow);
