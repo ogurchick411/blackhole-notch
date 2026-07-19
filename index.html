@@ -19,25 +19,49 @@
     
     .notch {
       width: 180px; 
-      height: 28px;
-      background: rgba(0, 0, 0, 0.95);
-      backdrop-filter: blur(20px);
-      border-bottom-left-radius: 18px;
-      border-bottom-right-radius: 18px;
-      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      height: 32px; 
+      background: #000000 !important;
+      border-bottom-left-radius: 16px;
+      border-bottom-right-radius: 16px;
+      transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
       display: flex;
       align-items: center;
-      padding: 0 20px;
+      justify-content: space-between;
+      padding: 0 14px;
       box-sizing: border-box;
       overflow: hidden;
-      border: 0.5px solid rgba(255, 255, 255, 0.1);
+      border: none !important;
+      outline: none !important;
+      box-shadow: none !important;
+    }
+    
+    .notch.music-active {
+      width: 270px; 
+      height: 32px;  
+      border-bottom-left-radius: 20px;  
+      border-bottom-right-radius: 20px; 
+      border: none !important;
     }
     
     .notch:hover {
-      width: 540px;  
-      height: 130px; 
-      border-bottom-left-radius: 32px;
-      border-bottom-right-radius: 32px;
+      width: 540px !important;  
+      height: 130px !important; 
+      border-bottom-left-radius: 32px !important;
+      border-bottom-right-radius: 32px !important;
+      padding: 0 24px;
+    }
+
+    .mini-art {
+      width: 18px;
+      height: 18px;
+      background: linear-gradient(135deg, #2c3e50, #3498db);
+      border-radius: 4px;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .notch.music-active .mini-art {
+      opacity: 1;
     }
 
     .player-container {
@@ -45,14 +69,19 @@
       align-items: center;
       width: 100%;
       opacity: 0;
-      transition: opacity 0.2s ease;
+      display: none;
       color: white;
       justify-content: space-between;
     }
 
     .notch:hover .player-container {
+      display: flex;
       opacity: 1;
-      transition: opacity 0.3s ease 0.1s;
+    }
+
+    .notch:hover .mini-art,
+    .notch:hover .mini-eq {
+      display: none !important;
     }
 
     .meta-box {
@@ -60,14 +89,13 @@
       align-items: center;
     }
 
-    .album-art {
+    .album-art-full {
       width: 65px;
       height: 65px;
       background: linear-gradient(135deg, #2c3e50, #3498db);
       border-radius: 16px;
       margin-right: 18px;
-      flex-shrink: 0;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
     }
 
     .track-info {
@@ -79,87 +107,135 @@
       font-size: 16px;
       font-weight: 600;
       margin-bottom: 4px;
-      letter-spacing: -0.2px;
     }
 
     .track-artist {
       font-size: 13px;
       color: rgba(255, 255, 255, 0.6);
     }
- 
+
     .equalizer {
       display: flex;
       align-items: flex-end;
-      height: 30px;
       gap: 3px;
-      padding-right: 10px;
+    }
+
+    .mini-eq {
+      height: 14px;
+      gap: 2px;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .notch.music-active .mini-eq {
+      opacity: 1;
     }
 
     .bar {
+      width: 2px;
+      background-color: #1db954;
+      border-radius: 1px;
+      height: 3px;
+    }
+
+    .player-container .bar {
       width: 3px;
-      height: 5px;
-      background-color: #1db954;  
-      border-radius: 3px;
-      transition: height 0.2s ease;
-    }
- 
-    .notch:hover .playing .bar {
-      animation: bounce 0.8s ease infinite alternate;
-    }
-
-    .notch:hover .playing .bar:nth-child(2) { animation-delay: 0.2s; }
-    .notch:hover .playing .bar:nth-child(3) { animation-delay: 0.4s; }
-    .notch:hover .playing .bar:nth-child(4) { animation-delay: 0.1s; }
-    .notch:hover .playing .bar:nth-child(5) { animation-delay: 0.3s; }
-
-    @keyframes bounce {
-      100% { height: 28px; }
+      border-radius: 2px;
     }
   </style>
 </head>
 <body>
 
-  <div class="notch">
+  <div class="notch" id="island">
+    <div class="mini-art"></div>
+    
     <div class="player-container">
       <div class="meta-box">
-        <div class="album-art" id="albumArt"></div>
+        <div class="album-art-full"></div>
         <div class="track-info">
           <div class="track-title" id="trackTitle">Nothing Playing</div>
           <div class="track-artist" id="trackArtist">Start playing music</div>
         </div>
       </div>
       
-      <div class="equalizer" id="eqContainer">
-        <div class="bar"></div>
+      <div class="equalizer">
         <div class="bar"></div>
         <div class="bar"></div>
         <div class="bar"></div>
         <div class="bar"></div>
       </div>
     </div>
+    
+    <div class="equalizer mini-eq" id="miniEq">
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+    </div>
   </div>
 
   <script>
     const { ipcRenderer } = require('electron');
-    const notch = document.querySelector('.notch');
+    const island = document.getElementById('island');
+    const miniEq = document.getElementById('miniEq');
+    
+    const fullBars = document.querySelectorAll('.player-container .bar');
+    const miniBars = document.querySelectorAll('.mini-eq .bar');
 
-    notch.addEventListener('mouseenter', () => {
+    let animationId;
+    let isAnimating = false;
+
+    function renderEqualizer() {
+        if (!isAnimating) return;
+
+        fullBars.forEach((bar, i) => {
+            const base = [14, 18, 12, 16][i] || 15;
+            const heightFull = Math.sin(Date.now() / 200 + i) * (base / 2) + (base / 2) + 4;
+            bar.style.height = `${heightFull}px`;
+        });
+        
+        miniBars.forEach((bar, i) => {
+            const base = [8, 10, 7, 9][i] || 8;
+            const heightMini = Math.sin(Date.now() / 150 + i) * (base / 2) + (base / 2) + 3;
+            bar.style.height = `${heightMini}px`;
+        });
+
+        animationId = requestAnimationFrame(renderEqualizer);
+    }
+
+    function freezeEqualizer() {
+        isAnimating = false;
+        cancelAnimationFrame(animationId);
+        fullBars.forEach(bar => bar.style.height = '3px');
+        miniBars.forEach(bar => bar.style.height = '3px');
+    }
+
+    island.addEventListener('mouseenter', () => {
         ipcRenderer.send('trigger-haptic');
     });
 
     ipcRenderer.on('music-update', (event, data) => {
         const titleEl = document.getElementById('trackTitle');
         const artistEl = document.getElementById('trackArtist');
-        const eqEl = document.getElementById('eqContainer');
 
         if (data.playing) {
             titleEl.innerText = data.title;
             artistEl.innerText = data.artist;
-            eqEl.classList.add('playing');  
+            island.classList.add('music-active');
+            
+            if (data.status === 'PLAYING') {
+                if (!isAnimating) {
+                    isAnimating = true;
+                    renderEqualizer();
+                }
+            } else if (data.status === 'PAUSED') {
+                freezeEqualizer();
+            }
         } else {
             titleEl.innerText = "Nothing Playing";
             artistEl.innerText = "Start playing music";
-            eqEl.classList.remove('playing');  
+            island.classList.remove('music-active');
+            freezeEqualizer();
         }
     });
   </script>

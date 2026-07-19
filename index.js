@@ -52,9 +52,9 @@ function startMusicTicker() {
         if processList contains "Music" then
             tell application "Music"
                 if player state is playing then
-                    return (name of current track) & "|||" & (artist of current track)
+                    return (name of current track) & "|||" & (artist of current track) & "|||PLAYING"
                 else
-                    return "PAUSED"
+                    return (name of current track) & "|||" & (artist of current track) & "|||PAUSED"
                 end if
             end tell
         else
@@ -63,22 +63,40 @@ function startMusicTicker() {
     `;
 
     setInterval(() => {
+        if (!mainWindow || mainWindow.isDestroyed()) return;
+
         exec(`osascript -e '${appleScript}'`, (err, stdout) => {
             if (err) return;
+            if (!mainWindow || mainWindow.isDestroyed()) return;
+            
             const response = stdout.trim();
             
-            if (response === "NOT_RUNNING" || response === "PAUSED") {
-                mainWindow.webContents.send('music-update', { playing: false });
+            if (response === "NOT_RUNNING") {
+                mainWindow.webContents.send('music-update', { playing: false, status: 'STOPPED' });
             } else {
-                const [title, artist] = response.split('|||');
-                mainWindow.webContents.send('music-update', {
-                    playing: true,
-                    title: title || 'Неизвестный трек',
-                    artist: artist || 'Неизвестный исполнитель'
-                });
+                const parts = response.split('|||');
+                const title = parts[0] || 'Unknown Track';
+                const artist = parts[1] || 'Unknown Artist';
+                const status = parts[2] || 'PAUSED';
+
+                if (status === 'PAUSED') {
+                    mainWindow.webContents.send('music-update', {
+                        playing: true,
+                        status: 'PAUSED',
+                        title: title,
+                        artist: artist
+                    });
+                } else {
+                    mainWindow.webContents.send('music-update', {
+                        playing: true,
+                        status: 'PLAYING',
+                        title: title,
+                        artist: artist
+                    });
+                }
             }
         });
-    }, 2000);  
+    }, 1000);  
 }
 
 app.whenReady().then(createNotchWindow);
