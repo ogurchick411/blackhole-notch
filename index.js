@@ -4,21 +4,15 @@ const { exec } = require('child_process');
 
 let mainWindow;
 
-function getNotchDimensions() {
-    const model = os.cpus()[0]?.model || '';
-    let width = 180;
-    let height = 28;
-    return { width, height };
-}
-
 function createNotchWindow() {
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width: screenWidth } = primaryDisplay.bounds;
 
+    // TODO: заебался уже. легче уже было 10 баксов заплатить за подписку чем эту челку руками двигать
     mainWindow = new BrowserWindow({
-        width: 540,
-        height: 150,
-        x: Math.floor((screenWidth - 540) / 2),
+        width: 180,
+        height: 32,
+        x: Math.floor((screenWidth - 180) / 2),
         y: 0,
         frame: false,
         transparent: true,
@@ -79,25 +73,46 @@ function startMusicTicker() {
                 const artist = parts[1] || 'Unknown Artist';
                 const status = parts[2] || 'PAUSED';
 
-                if (status === 'PAUSED') {
-                    mainWindow.webContents.send('music-update', {
-                        playing: true,
-                        status: 'PAUSED',
-                        title: title,
-                        artist: artist
-                    });
-                } else {
-                    mainWindow.webContents.send('music-update', {
-                        playing: true,
-                        status: 'PLAYING',
-                        title: title,
-                        artist: artist
-                    });
-                }
+                mainWindow.webContents.send('music-update', {
+                    playing: true,
+                    status: status,
+                    title: title,
+                    artist: artist
+                });
             }
         });
     }, 1000);  
 }
+
+ipcMain.on('resize-window', (event, width, height) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width: screenWidth } = primaryDisplay.bounds;
+    
+    mainWindow.setBounds({
+        width: width,
+        height: height,
+        x: Math.floor((screenWidth - width) / 2),
+        y: 0
+    });
+});
+
+ipcMain.on('set-ignore-mouse-events', (event, ignore, options) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.setIgnoreMouseEvents(ignore, options);
+    }
+});
+
+ipcMain.on('open-apple-music', () => {
+    const openScript = `
+        tell application "Music"
+            activate
+        end tell
+    `;
+    exec(`osascript -e '${openScript}'`, (err) => {
+        if (err) console.error("Failed to open Apple Music:", err);
+    });
+});
 
 app.whenReady().then(createNotchWindow);
 

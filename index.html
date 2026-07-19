@@ -23,27 +23,20 @@
       background: #000000 !important;
       border-bottom-left-radius: 16px;
       border-bottom-right-radius: 16px;
-      transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      transition: all 0.3s ease;
       display: flex;
       align-items: center;
       justify-content: space-between;
       padding: 0 14px;
       box-sizing: border-box;
       overflow: hidden;
-      border: none !important;
-      outline: none !important;
-      box-shadow: none !important;
     }
     
     .notch.music-active {
       width: 270px; 
-      height: 32px;  
-      border-bottom-left-radius: 20px;  
-      border-bottom-right-radius: 20px; 
-      border: none !important;
     }
     
-    .notch:hover {
+    .notch.expanded {
       width: 540px !important;  
       height: 130px !important; 
       border-bottom-left-radius: 32px !important;
@@ -54,7 +47,7 @@
     .mini-art {
       width: 18px;
       height: 18px;
-      background: linear-gradient(135deg, #2c3e50, #3498db);
+      background: #1db954;
       border-radius: 4px;
       opacity: 0;
       transition: opacity 0.3s ease;
@@ -68,50 +61,58 @@
       display: flex;
       align-items: center;
       width: 100%;
-      opacity: 0;
-      display: none;
       color: white;
       justify-content: space-between;
+      display: none;
     }
 
-    .notch:hover .player-container {
+    .notch.expanded .player-container {
       display: flex;
-      opacity: 1;
     }
 
-    .notch:hover .mini-art,
-    .notch:hover .mini-eq {
+    .notch.expanded .mini-art,
+    .notch.expanded .mini-eq {
       display: none !important;
     }
 
     .meta-box {
       display: flex;
       align-items: center;
+      max-width: 70%;
     }
 
     .album-art-full {
       width: 65px;
       height: 65px;
-      background: linear-gradient(135deg, #2c3e50, #3498db);
+      background: #1db954;
       border-radius: 16px;
       margin-right: 18px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      cursor: pointer;
+      flex-shrink: 0;
     }
 
     .track-info {
       display: flex;
       flex-direction: column;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
     }
 
     .track-title {
       font-size: 16px;
       font-weight: 600;
       margin-bottom: 4px;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .track-artist {
       font-size: 13px;
       color: rgba(255, 255, 255, 0.6);
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .equalizer {
@@ -151,7 +152,7 @@
     
     <div class="player-container">
       <div class="meta-box">
-        <div class="album-art-full"></div>
+        <div class="album-art-full" id="albumArt"></div>
         <div class="track-info">
           <div class="track-title" id="trackTitle">Nothing Playing</div>
           <div class="track-artist" id="trackArtist">Start playing music</div>
@@ -177,27 +178,25 @@
   <script>
     const { ipcRenderer } = require('electron');
     const island = document.getElementById('island');
-    const miniEq = document.getElementById('miniEq');
     
     const fullBars = document.querySelectorAll('.player-container .bar');
     const miniBars = document.querySelectorAll('.mini-eq .bar');
 
     let animationId;
     let isAnimating = false;
+    let hasMusic = false;
 
     function renderEqualizer() {
         if (!isAnimating) return;
 
         fullBars.forEach((bar, i) => {
             const base = [14, 18, 12, 16][i] || 15;
-            const heightFull = Math.sin(Date.now() / 200 + i) * (base / 2) + (base / 2) + 4;
-            bar.style.height = `${heightFull}px`;
+            bar.style.height = `${Math.sin(Date.now() / 200 + i) * (base / 2) + (base / 2) + 4}px`;
         });
         
         miniBars.forEach((bar, i) => {
             const base = [8, 10, 7, 9][i] || 8;
-            const heightMini = Math.sin(Date.now() / 150 + i) * (base / 2) + (base / 2) + 3;
-            bar.style.height = `${heightMini}px`;
+            bar.style.height = `${Math.sin(Date.now() / 150 + i) * (base / 2) + (base / 2) + 3}px`;
         });
 
         animationId = requestAnimationFrame(renderEqualizer);
@@ -210,8 +209,29 @@
         miniBars.forEach(bar => bar.style.height = '3px');
     }
 
-    island.addEventListener('mouseenter', () => {
-        ipcRenderer.send('trigger-haptic');
+    window.addEventListener('mousemove', (e) => {
+        const rect = island.getBoundingClientRect();
+        const isInside = e.clientY <= rect.bottom && e.clientX >= rect.left && e.clientX <= rect.right;
+        
+        if (isInside) {
+            ipcRenderer.send('set-ignore-mouse-events', false);
+            if (hasMusic && !island.classList.contains('expanded')) {
+                ipcRenderer.send('trigger-haptic');
+                ipcRenderer.send('resize-window', 540, 150);
+                island.classList.add('expanded');
+            }
+        } else {
+            if (island.classList.contains('expanded')) {
+                island.classList.remove('expanded');
+                const defaultWidth = hasMusic ? 270 : 180;
+                ipcRenderer.send('resize-window', defaultWidth, 32);
+                ipcRenderer.send('set-ignore-mouse-events', true, { forward: true });
+            }
+        }
+    });
+
+    document.getElementById('albumArt').addEventListener('click', () => {
+        ipcRenderer.send('open-apple-music');
     });
 
     ipcRenderer.on('music-update', (event, data) => {
@@ -219,22 +239,29 @@
         const artistEl = document.getElementById('trackArtist');
 
         if (data.playing) {
+            hasMusic = true;
             titleEl.innerText = data.title;
             artistEl.innerText = data.artist;
             island.classList.add('music-active');
+            
+            if (!island.classList.contains('expanded')) {
+                ipcRenderer.send('resize-window', 270, 32);
+            }
             
             if (data.status === 'PLAYING') {
                 if (!isAnimating) {
                     isAnimating = true;
                     renderEqualizer();
                 }
-            } else if (data.status === 'PAUSED') {
+            } else {
                 freezeEqualizer();
             }
         } else {
+            hasMusic = false;
             titleEl.innerText = "Nothing Playing";
             artistEl.innerText = "Start playing music";
-            island.classList.remove('music-active');
+            island.classList.remove('music-active', 'expanded');
+            ipcRenderer.send('resize-window', 180, 32);
             freezeEqualizer();
         }
     });
