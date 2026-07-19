@@ -1,44 +1,41 @@
-const { app, BrowserWindow, screen, ipcMain, systemPreferences } = require('electron');
-const os = require('os');
-const { exec } = require('child_process');
+const { app, BrowserWindow, ipcMain, screen } = require('electron');
 const path = require('path');
+const { exec } = require('child_process');
 const fs = require('fs');
 
 let mainWindow;
 const coverPath = '/tmp/notch_cover.png';
 
-function createNotchWindow() {
-    const primaryDisplay = screen.getPrimaryDisplay();
-    const { width: screenWidth } = primaryDisplay.bounds;
-
-    // TODO: заебался уже. легче уже было 10 баксов заплатить за подписку чем эту челку руками двигать
+function createWindow() {
     mainWindow = new BrowserWindow({
         width: 180,
         height: 32,
-        x: Math.floor((screenWidth - 180) / 2),
+        x: 0,
         y: 0,
-        frame: false,
         transparent: true,
-        alwaysOnTop: true,
+        frame: false,
         resizable: false,
-        focusable: false,
+        hasShadow: false,
+        alwaysOnTop: true,
+        type: 'panel',
         enableLargerThanScreen: true,
-        hasShadow: false, 
         webPreferences: {
             nodeIntegration: true,
-            contextIsolation: false
+            contextIsolation: false,
         }
     });
 
-    mainWindow.setAlwaysOnTop(true, 'screen-saver');
-    mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-    mainWindow.setIgnoreMouseEvents(true, { forward: true });
-
     mainWindow.loadFile('index.html');
+    mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
 
-    mainWindow.webContents.on('did-finish-load', () => {
-        startMusicTicker();
-    });
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width } = primaryDisplay.bounds;
+    const windowWidth = mainWindow.getBounds().width;
+    const x = Math.floor((width - windowWidth) / 2);
+    
+    mainWindow.setPosition(x, 0);
+    mainWindow.setIgnoreMouseEvents(true, { forward: true });
 }
 
 function startMusicTicker() {
@@ -54,21 +51,30 @@ function startMusicTicker() {
                     set trackArtist to artist of current track
                     set trackBPM to bpm of current track
                     set trackGenre to genre of current track
-                    set stateStr to "PLAYING"
-                    if playerState is paused then set stateStr to "PAUSED"
+                    set curPos to player position
+                    set totalDur to duration of current track
                     
+                    set hasArt to "false"
                     try
-                        set someArtwork to raw data of artwork 1 of current track
-                        set fileRef to (open for access POSIX file "${coverPath}" with write permission)
-                        set eof fileRef to 0
-                        write someArtwork to fileRef
-                        close access fileRef
-                        set hasArt to "true"
+                        if (count of artworks of current track) > 0 then
+                            set hasArt to "true"
+                            set artData to raw data of artwork 1 of current track
+                            set filePath to posix path of "${coverPath}"
+                            
+                            set fileRef to open for access filePath with write permission
+                            set eof fileRef to 0
+                            write artData to fileRef
+                            close access fileRef
+                        end if
                     on error
-                        set hasArt to "false"
+                        try
+                            close access file "${coverPath}"
+                        end try
                     end try
                     
-                    return trackName & "|||" & trackArtist & "|||" & stateStr & "|||" & trackBPM & "|||" & trackGenre & "|||" & hasArt
+                    set stateStr to "PLAYING"
+                    if playerState is paused then set stateStr to "PAUSED"
+                    return trackName & "|||" & trackArtist & "|||" & stateStr & "|||" & trackBPM & "|||" & trackGenre & "|||" & curPos & "|||" & totalDur & "|||" & hasArt
                 else
                     return "NOT_PLAYING"
                 end if
@@ -83,91 +89,59 @@ function startMusicTicker() {
 
         exec(`osascript -e '${appleScript}'`, (err, stdout) => {
             if (err) return;
-            if (!mainWindow || mainWindow.isDestroyed()) return;
-            
             const response = stdout.trim();
             
-            if (response === "NOT_RUNNING" || response === "NOT_PLAYING") {
+            if (response === "NOT_RUNNING" || response === "NOT_PLAYING" || response === "") {
                 mainWindow.webContents.send('music-update', { playing: false, status: 'STOPPED' });
             } else {
                 const parts = response.split('|||');
-                const title = parts[0] || 'Unknown Track';
-                const artist = parts[1] || 'Unknown Artist';
-                const status = parts[2] || 'PAUSED';
-                const bpm = parseInt(parts[3]) || 0;
-                const genre = parts[4] || 'Unknown';
-                const hasArt = parts[5] === 'true';
- 
                 mainWindow.webContents.send('music-update', {
                     playing: true,
-                    status: status,
-                    title: title,
-                    artist: artist,
-                    bpm: bpm,
-                    genre: genre,
-                    hasArt: hasArt
+                    title: parts[0] || 'Unknown Track',
+                    artist: parts[1] || 'Unknown Artist',
+                    status: parts[2] || 'PAUSED',
+                    bpm: parseInt(parts[3]) || 0,
+                    genre: parts[4] || 'Unknown',
+                    position: parseFloat(parts[5]) || 0,
+                    duration: parseFloat(parts[6]) || 0,
+                    hasArt: parts[7] === "true"
                 });
             }
         });
-    }, 1000);  
+    }, 1000);
 }
+
+app.whenReady().then(() => {
+    if (process.platform === 'darwin') {
+        app.dock.hide();
+    }
+    createWindow();
+    startMusicTicker();
+});
 
 ipcMain.on('resize-window', (event, width, height) => {
     if (!mainWindow || mainWindow.isDestroyed()) return;
     const primaryDisplay = screen.getPrimaryDisplay();
-    const { width: screenWidth } = primaryDisplay.bounds;
-    
-    mainWindow.setBounds({
-        width: width,
-        height: height,
-        x: Math.floor((screenWidth - width) / 2),
-        y: 0
-    });
+    const screenWidth = primaryDisplay.bounds.width;
+    const x = Math.floor((screenWidth - width) / 2);
+    mainWindow.setBounds({ x: x, y: 0, width: width, height: height });
 });
 
 ipcMain.on('set-ignore-mouse-events', (event, ignore, options) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.setIgnoreMouseEvents(ignore, options);
-    }
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    mainWindow.setIgnoreMouseEvents(ignore, options);
 });
 
-ipcMain.on('open-apple-music', () => {
-    const openScript = `
-        tell application "Music"
-            activate
-        end tell
-    `;
-    exec(`osascript -e '${openScript}'`, (err) => {
-        if (err) console.error("Failed to open Apple Music:", err);
-    });
-});
+ipcMain.on('open-apple-music', () => { exec('open -a "Music"'); });
 
 ipcMain.on('music-control', (event, action) => {
-    let scriptCommand = '';
-    if (action === 'playpause') scriptCommand = 'playpause';
-    if (action === 'next') scriptCommand = 'next track';
-    if (action === 'prev') scriptCommand = 'previous track';
-
-    if (!scriptCommand) return;
-
-    const controlScript = `
-        tell application "Music"
-            ${scriptCommand}
-        end tell
-    `;
-    exec(`osascript -e '${controlScript}'`, (err) => {
-        if (err) console.error(`Failed to execute music control (${action}):`, err);
-    });
+    let cmd = '';
+    if (action === 'playpause') cmd = 'playpause';
+    if (action === 'next') cmd = 'next track';
+    if (action === 'prev') cmd = 'previous track';
+    if (cmd) exec(`osascript -e 'tell application "Music" to ${cmd}'`);
 });
 
-app.whenReady().then(createNotchWindow);
-
-app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') app.quit();
-});
-
-ipcMain.on('trigger-haptic', () => {
-    if (process.platform === 'darwin' && systemPreferences.vibrateHW) {
-        systemPreferences.vibrateHW([0]); 
-    }
+ipcMain.on('music-seek', (event, seekTime) => {
+    exec(`osascript -e 'tell application "Music" to set player position to ${seekTime}'`);
 });
