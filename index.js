@@ -26,8 +26,7 @@ function createNotchWindow() {
         resizable: false,
         focusable: false,
         enableLargerThanScreen: true,
-        type: 'panel',
-        hiddenInMissionControl: true,
+        hasShadow: false, 
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false
