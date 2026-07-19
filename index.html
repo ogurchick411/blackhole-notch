@@ -6,7 +6,7 @@
     body {
       margin: 0;
       padding: 0;
-      background: transparent;
+      background: transparent !important;
       overflow: hidden;
       display: flex;
       justify-content: center;
@@ -21,7 +21,7 @@
     .notch {
       width: 180px; 
       height: 32px; 
-      background: #000000 !important;
+      background: #000000;
       border-top-left-radius: 0px !important;
       border-top-right-radius: 0px !important;
       border-bottom-left-radius: 0px;
@@ -34,6 +34,8 @@
       box-sizing: border-box;
       overflow: hidden;
       position: relative;
+      z-index: 1;
+      pointer-events: auto !important;
     }
     
     .notch.music-active {
@@ -42,10 +44,14 @@
     
     .notch.expanded {
       width: 540px !important;  
-      height: 142px !important;  
+      height: 142px !important; 
       border-bottom-left-radius: 24px !important;
       border-bottom-right-radius: 24px !important;
       padding: 16px 24px;
+    }
+
+    .notch.expanded.playing {
+      background: radial-gradient(circle at var(--x, 30%) var(--y, 30%), #073b18 0%, #021a0a 45%, #000000 70%) !important;
     }
 
     .mini-art {
@@ -71,6 +77,8 @@
       color: white;
       justify-content: space-between;
       position: relative;
+      z-index: 5;
+      pointer-events: auto !important;
     }
 
     .notch.expanded .player-container {
@@ -81,7 +89,7 @@
     .notch.expanded .mini-eq {
       display: none !important;
     }
- 
+
     .top-section {
       display: flex;
       align-items: center;
@@ -131,15 +139,15 @@
       text-overflow: ellipsis;
       overflow: hidden;
     }
- 
+
     .equalizer {
       display: flex;
       align-items: flex-end;
-      gap: 2px;
+      gap: 2.5px;
     }
     
     .top-section .equalizer {
-      height: 16px;
+      height: 18px;
       margin-bottom: 4px;
     }
 
@@ -152,11 +160,12 @@
 
     .bar {
       width: 2px;
-      background-color: #1db954;
+      background: linear-gradient(to top, #1db954, #1ed760);
       border-radius: 1px;
       height: 3px;
+      transition: background 0.3s ease;
     }
- 
+
     .timeline-container {
       width: 100%;
       display: flex;
@@ -185,7 +194,7 @@
       top: 0;
       height: 100%;
       width: 0%;
-      background: #ffffff;
+      background: #1db954;
       border-radius: 2px;
     }
 
@@ -220,7 +229,7 @@
       color: rgba(255, 255, 255, 0.4);
       font-variant-numeric: tabular-nums;
     }
- 
+
     .bottom-section {
       display: flex;
       justify-content: center;
@@ -240,14 +249,17 @@
       color: white;
       cursor: pointer;
       opacity: 0.85;
-      transition: opacity 0.2s, transform 0.1s;
+      transition: opacity 0.2s, transform 0.1s, color 0.2s;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 4px;
+      padding: 6px;
     }
 
-    .btn:hover { opacity: 1; }
+    .btn:hover { 
+      opacity: 1; 
+      color: #1ed760;
+    }
     .btn:active { transform: scale(0.88); }
 
     .icon-prev, .icon-next {
@@ -360,6 +372,7 @@
     let lastUpdateTimestamp = 0;
     let smoothTimelineInterval = null;
     let isDragging = false;
+    let lavaRaf = null;
 
     let fullHeights = [3, 3, 3, 3];
     let miniHeights = [3, 3, 3, 3];
@@ -382,12 +395,36 @@
         const basesFull = [12, 15, 10, 14];
         const basesMini = [8, 10, 7, 9];
         for (let i = 0; i < 4; i++) {
-            if (Math.random() > 0.5) targetFull[i] = Math.floor(Math.random() * basesFull[i]) + 3;
-            if (Math.random() > 0.5) targetMini[i] = Math.floor(Math.random() * basesMini[i]) + 3;
+            if (Math.random() > 0.4) targetFull[i] = Math.floor(Math.random() * basesFull[i]) + 3;
+            if (Math.random() > 0.4) targetMini[i] = Math.floor(Math.random() * basesMini[i]) + 3;
         }
     }
 
-    setInterval(updateTargets, 60);
+    setInterval(updateTargets, 80);
+
+    function animateLavaGlow() {
+        if (currentStatus !== 'PLAYING' || !island.classList.contains('expanded')) {
+            island.style.removeProperty('--x');
+            island.style.removeProperty('--y');
+            lavaRaf = null;
+            return;
+        }
+
+        const t = Date.now() * 0.0008; 
+        const x = 50 + Math.sin(t) * 35 + Math.cos(t * 0.6) * 10;
+        const y = 50 + Math.cos(t * 0.8) * 35 + Math.sin(t * 0.5) * 10;
+
+        island.style.setProperty('--x', `${x}%`);
+        island.style.setProperty('--y', `${y}%`);
+
+        lavaRaf = requestAnimationFrame(animateLavaGlow);
+    }
+
+    function startLavaAnimation() {
+        if (!lavaRaf && currentStatus === 'PLAYING' && island.classList.contains('expanded')) {
+            lavaRaf = requestAnimationFrame(animateLavaGlow);
+        }
+    }
 
     function renderEqualizer() {
         let hasMovement = false;
@@ -397,7 +434,7 @@
             const base = [12, 15, 10, 14][i];
             const liveTarget = currentStatus === 'PLAYING' ? Math.sin(speedFactor + i) * (base / 2) + (base / 2) + 3 : 3;
             const mixedTarget = currentStatus === 'PLAYING' ? (targetFull[i] + liveTarget) / 2 : 3;
-            fullHeights[i] += (mixedTarget - fullHeights[i]) * 0.2;
+            fullHeights[i] += (mixedTarget - fullHeights[i]) * 0.12;
             bar.style.height = `${fullHeights[i]}px`;
             if (Math.abs(mixedTarget - fullHeights[i]) > 0.1) hasMovement = true;
         });
@@ -407,7 +444,7 @@
             const base = [8, 10, 7, 9][i];
             const liveTarget = currentStatus === 'PLAYING' ? Math.sin(speedFactor + i) * (base / 2) + (base / 2) + 3 : 3;
             const mixedTarget = currentStatus === 'PLAYING' ? (targetMini[i] + liveTarget) / 2 : 3;
-            miniHeights[i] += (mixedTarget - miniHeights[i]) * 0.2;
+            miniHeights[i] += (mixedTarget - miniHeights[i]) * 0.12;
             bar.style.height = `${miniHeights[i]}px`;
             if (Math.abs(mixedTarget - miniHeights[i]) > 0.1) hasMovement = true;
         });
@@ -445,18 +482,30 @@
 
     island.addEventListener('mouseenter', () => {
         ipcRenderer.send('set-ignore-mouse-events', false);
+
         if (hasMusic && !island.classList.contains('expanded')) {
             ipcRenderer.send('resize-window', 540, 142); 
             island.classList.add('expanded');
+            startLavaAnimation();
         }
     });
 
     island.addEventListener('mouseleave', () => {
         if (island.classList.contains('expanded') && !isDragging) {
             island.classList.remove('expanded');
+            if (lavaRaf) {
+                cancelAnimationFrame(lavaRaf);
+                lavaRaf = null;
+            }
+            island.style.removeProperty('--x');
+            island.style.removeProperty('--y');
+            
             const defaultWidth = hasMusic ? 270 : 180;
             ipcRenderer.send('resize-window', defaultWidth, 32);
-            ipcRenderer.send('set-ignore-mouse-events', true, { forward: true });
+            
+            if (!hasMusic) {
+                ipcRenderer.send('set-ignore-mouse-events', true, { forward: true });
+            }
         }
     });
 
@@ -506,12 +555,16 @@
         if (currentStatus === 'PLAYING') {
             currentStatus = 'PAUSED';
             playPauseIcon.className = 'icon-play';
+            if (lavaRaf) {
+                cancelAnimationFrame(lavaRaf);
+                lavaRaf = null;
+            }
         } else {
-            currentStatus = 'PLAYING';
             currentStatus = 'PLAYING';
             playPauseIcon.className = 'icon-pause';
             lastUpdateTimestamp = Date.now();
             startEqualizerAnimation();
+            startLavaAnimation();
         }
         ipcRenderer.send('music-control', 'playpause');
     });
@@ -556,11 +609,18 @@
             currentStatus = data.status;
             if (data.status === 'PLAYING') {
                 playPauseIcon.className = 'icon-pause';
+                island.classList.add('playing');
                 startEqualizerAnimation();
                 startSmoothTimeline();
+                startLavaAnimation();
             } else {
                 playPauseIcon.className = 'icon-play';
+                island.classList.remove('playing');
                 if (smoothTimelineInterval) clearInterval(smoothTimelineInterval);
+                if (lavaRaf) {
+                    cancelAnimationFrame(lavaRaf);
+                    lavaRaf = null;
+                }
                 
                 if (!isDragging) {
                     const progressPercent = (trackPosition / trackDuration) * 100;
@@ -572,7 +632,12 @@
             }
         } else {
             hasMusic = false;
+            island.classList.remove('playing');
             if (smoothTimelineInterval) clearInterval(smoothTimelineInterval);
+            if (lavaRaf) {
+                cancelAnimationFrame(lavaRaf);
+                lavaRaf = null;
+            }
             currentTrackSignature = '';
             titleEl.innerText = "Nothing Playing";
             artistEl.innerText = "Start playing music";
