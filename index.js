@@ -124,7 +124,14 @@ ipcMain.on('resize-window', (event, width, height) => {
     const primaryDisplay = screen.getPrimaryDisplay();
     const screenWidth = primaryDisplay.bounds.width;
     const x = Math.floor((screenWidth - width) / 2);
+    
     mainWindow.setBounds({ x: x, y: 0, width: width, height: height });
+
+    if (width > 180) {
+        mainWindow.setIgnoreMouseEvents(false);
+    } else {
+        mainWindow.setIgnoreMouseEvents(true, { forward: true });
+    }
 });
 
 ipcMain.on('set-ignore-mouse-events', (event, ignore, options) => {
@@ -133,6 +140,14 @@ ipcMain.on('set-ignore-mouse-events', (event, ignore, options) => {
 });
 
 ipcMain.on('open-apple-music', () => { exec('open -a "Music"'); });
+
+ipcMain.on('music-control', (event, action) => {
+    let cmd = '';
+    if (action === 'playpause') cmd = 'playpause';
+    if (action === 'next') cmd = 'next track';
+    if (action === 'prev') cmd = 'previous track';
+    if (cmd) exec(`osascript -e 'tell application "Music" to ${cmd}'`);
+});
 
 ipcMain.on('music-control', (event, action) => {
     let cmd = '';
