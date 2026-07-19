@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <style>
     body {
       margin: 0;
@@ -12,25 +13,82 @@
       align-items: flex-start;
       width: 100vw;
       height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
+    
     .notch {
-      width: 180px;  
-      height: 28px;  
+      width: 180px; 
+      height: 28px;
       background: black;
       border-bottom-left-radius: 18px;
       border-bottom-right-radius: 18px;
       transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      display: flex;
+      align-items: center;
+      padding: 0 15px;
+      box-sizing: border-box;
+      overflow: hidden;
     }
+    
     .notch:hover {
-      width: 540px;   
-      height: 130px;  
+      width: 540px;  
+      height: 130px; 
       border-bottom-left-radius: 32px;
       border-bottom-right-radius: 32px;
+    }
+
+    .player-container {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      opacity: 0;  
+      transition: opacity 0.2s ease;
+      color: white;
+    }
+
+    .notch:hover .player-container {
+      opacity: 1;
+      transition: opacity 0.3s ease 0.1s;
+    }
+
+    .album-art {
+      width: 60px;
+      height: 60px;
+      background: #333;
+      border-radius: 12px;
+      margin-right: 15px;
+      flex-shrink: 0;
+    }
+
+    .track-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .track-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .track-artist {
+      font-size: 14px;
+      color: #aaa;
     }
   </style>
 </head>
 <body>
-  <div class="notch"></div>
+
+  <div class="notch">
+    <div class="player-container">
+      <div class="album-art" id="albumArt"></div>
+      <div class="track-info">
+        <div class="track-title" id="trackTitle">Ничего не играет</div>
+        <div class="track-artist" id="trackArtist">Запустите музыку</div>
+      </div>
+    </div>
+  </div>
+
   <script>
     const { ipcRenderer } = require('electron');
     const notch = document.querySelector('.notch');
