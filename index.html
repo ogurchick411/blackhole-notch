@@ -13,21 +13,24 @@
       align-items: flex-start;
       width: 100vw;
       height: 100vh;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", sans-serif;
+      -webkit-font-smoothing: antialiased;
     }
     
     .notch {
       width: 180px; 
       height: 28px;
-      background: black;
+      background: rgba(0, 0, 0, 0.95);
+      backdrop-filter: blur(20px);
       border-bottom-left-radius: 18px;
       border-bottom-right-radius: 18px;
       transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
       display: flex;
       align-items: center;
-      padding: 0 15px;
+      padding: 0 20px;
       box-sizing: border-box;
       overflow: hidden;
+      border: 0.5px solid rgba(255, 255, 255, 0.1);
     }
     
     .notch:hover {
@@ -41,9 +44,10 @@
       display: flex;
       align-items: center;
       width: 100%;
-      opacity: 0;  
+      opacity: 0;
       transition: opacity 0.2s ease;
       color: white;
+      justify-content: space-between;
     }
 
     .notch:hover .player-container {
@@ -51,13 +55,19 @@
       transition: opacity 0.3s ease 0.1s;
     }
 
+    .meta-box {
+      display: flex;
+      align-items: center;
+    }
+
     .album-art {
-      width: 60px;
-      height: 60px;
-      background: #333;
-      border-radius: 12px;
-      margin-right: 15px;
+      width: 65px;
+      height: 65px;
+      background: linear-gradient(135deg, #2c3e50, #3498db);
+      border-radius: 16px;
+      margin-right: 18px;
       flex-shrink: 0;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     }
 
     .track-info {
@@ -69,11 +79,41 @@
       font-size: 16px;
       font-weight: 600;
       margin-bottom: 4px;
+      letter-spacing: -0.2px;
     }
 
     .track-artist {
-      font-size: 14px;
-      color: #aaa;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.6);
+    }
+ 
+    .equalizer {
+      display: flex;
+      align-items: flex-end;
+      height: 30px;
+      gap: 3px;
+      padding-right: 10px;
+    }
+
+    .bar {
+      width: 3px;
+      height: 5px;
+      background-color: #1db954;  
+      border-radius: 3px;
+      transition: height 0.2s ease;
+    }
+ 
+    .notch:hover .playing .bar {
+      animation: bounce 0.8s ease infinite alternate;
+    }
+
+    .notch:hover .playing .bar:nth-child(2) { animation-delay: 0.2s; }
+    .notch:hover .playing .bar:nth-child(3) { animation-delay: 0.4s; }
+    .notch:hover .playing .bar:nth-child(4) { animation-delay: 0.1s; }
+    .notch:hover .playing .bar:nth-child(5) { animation-delay: 0.3s; }
+
+    @keyframes bounce {
+      100% { height: 28px; }
     }
   </style>
 </head>
@@ -81,10 +121,20 @@
 
   <div class="notch">
     <div class="player-container">
-      <div class="album-art" id="albumArt"></div>
-      <div class="track-info">
-        <div class="track-title" id="trackTitle">Nothing Playing</div>
-        <div class="track-artist" id="trackArtist">Start playing music</div>
+      <div class="meta-box">
+        <div class="album-art" id="albumArt"></div>
+        <div class="track-info">
+          <div class="track-title" id="trackTitle">Nothing Playing</div>
+          <div class="track-artist" id="trackArtist">Start playing music</div>
+        </div>
+      </div>
+      
+      <div class="equalizer" id="eqContainer">
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
       </div>
     </div>
   </div>
@@ -100,13 +150,16 @@
     ipcRenderer.on('music-update', (event, data) => {
         const titleEl = document.getElementById('trackTitle');
         const artistEl = document.getElementById('trackArtist');
+        const eqEl = document.getElementById('eqContainer');
 
         if (data.playing) {
             titleEl.innerText = data.title;
             artistEl.innerText = data.artist;
+            eqEl.classList.add('playing');  
         } else {
             titleEl.innerText = "Nothing Playing";
             artistEl.innerText = "Start playing music";
+            eqEl.classList.remove('playing');  
         }
     });
   </script>
