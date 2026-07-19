@@ -49,7 +49,9 @@
     .mini-art {
       width: 18px;
       height: 18px;
-      background: #1db954;
+      background: #282828;
+      background-size: cover;
+      background-position: center;
       border-radius: 4px;
       opacity: 0;
       transition: opacity 0.3s ease;
@@ -87,7 +89,9 @@
     .album-art-full {
       width: 65px;
       height: 65px;
-      background: #1db954;
+      background: #282828;
+      background-size: cover;
+      background-position: center;
       border-radius: 16px;
       margin-right: 18px;
       cursor: pointer;
@@ -115,7 +119,7 @@
       text-overflow: ellipsis;
       overflow: hidden;
     }
- 
+
     .controls-wrapper {
       position: absolute;
       left: 50%;
@@ -146,7 +150,7 @@
     .btn:active {
       transform: scale(0.88);
     }
- 
+
     .icon-prev, .icon-next {
       width: 18px;
       height: 14px;
@@ -201,6 +205,7 @@
       background-color: #1db954;
       border-radius: 1px;
       height: 3px;
+      transition: height 0.15s ease;
     }
 
     .player-container .equalizer {
@@ -216,7 +221,7 @@
 <body>
 
   <div class="notch" id="island">
-    <div class="mini-art"></div>
+    <div class="mini-art" id="miniArt"></div>
     
     <div class="player-container">
       <div class="meta-box">
@@ -252,6 +257,8 @@
   <script>
     const { ipcRenderer } = require('electron');
     const island = document.getElementById('island');
+    const miniArt = document.getElementById('miniArt');
+    const albumArt = document.getElementById('albumArt');
     
     const fullBars = document.querySelectorAll('.player-container .bar');
     const miniBars = document.querySelectorAll('.mini-eq .bar');
@@ -261,52 +268,102 @@
     let isAnimating = false;
     let hasMusic = false;
     let currentStatus = 'PAUSED';
+    let currentTrackSignature = '';  
+    
+    let currentSpeedDivider = 200; 
+
+    let fullHeights = [3, 3, 3, 3];
+    let miniHeights = [3, 3, 3, 3];
+    let targetFull = [3, 3, 3, 3];
+    let targetMini = [3, 3, 3, 3];
+
+    function updateTargets() {
+        if (currentStatus !== 'PLAYING') {
+            targetFull = [3, 3, 3, 3];
+            targetMini = [3, 3, 3, 3];
+            return;
+        }
+        const basesFull = [14, 18, 12, 16];
+        const basesMini = [8, 10, 7, 9];
+
+        for (let i = 0; i < 4; i++) {
+            if (Math.random() > 0.5) {
+                targetFull[i] = Math.floor(Math.random() * basesFull[i]) + 4;
+            }
+            if (Math.random() > 0.5) {
+                targetMini[i] = Math.floor(Math.random() * basesMini[i]) + 3;
+            }
+        }
+    }
+
+    setInterval(updateTargets, 60);
 
     function renderEqualizer() {
-        if (!isAnimating) return;
+        let hasMovement = false;
 
         fullBars.forEach((bar, i) => {
-            const base = [14, 18, 12, 16][i] || 15;
-            bar.style.height = `${Math.sin(Date.now() / 200 + i) * (base / 2) + (base / 2) + 4}px`;
+            const speedFactor = Date.now() / currentSpeedDivider;
+            const base = [14, 18, 12, 16][i];
+            const liveTarget = currentStatus === 'PLAYING' 
+                ? Math.sin(speedFactor + i) * (base / 2) + (base / 2) + 4 
+                : 3;
+            
+            const mixedTarget = currentStatus === 'PLAYING' ? (targetFull[i] + liveTarget) / 2 : 3;
+
+            fullHeights[i] += (mixedTarget - fullHeights[i]) * 0.2;
+            bar.style.height = `${fullHeights[i]}px`;
+            
+            if (Math.abs(mixedTarget - fullHeights[i]) > 0.1) hasMovement = true;
         });
         
         miniBars.forEach((bar, i) => {
-            const base = [8, 10, 7, 9][i] || 8;
-            bar.style.height = `${Math.sin(Date.now() / 150 + i) * (base / 2) + (base / 2) + 3}px`;
+            const speedFactor = Date.now() / (currentSpeedDivider * 0.75);
+            const base = [8, 10, 7, 9][i];
+            const liveTarget = currentStatus === 'PLAYING' 
+                ? Math.sin(speedFactor + i) * (base / 2) + (base / 2) + 3 
+                : 3;
+            
+            const mixedTarget = currentStatus === 'PLAYING' ? (targetMini[i] + liveTarget) / 2 : 3;
+
+            miniHeights[i] += (mixedTarget - miniHeights[i]) * 0.2;
+            bar.style.height = `${miniHeights[i]}px`;
+            
+            if (Math.abs(mixedTarget - miniHeights[i]) > 0.1) hasMovement = true;
         });
 
-        animationId = requestAnimationFrame(renderEqualizer);
-    }
-
-    function freezeEqualizer() {
-        isAnimating = false;
-        cancelAnimationFrame(animationId);
-        fullBars.forEach(bar => bar.style.height = '3px');
-        miniBars.forEach(bar => bar.style.height = '3px');
-    }
-
-    window.addEventListener('mousemove', (e) => {
-        const rect = island.getBoundingClientRect();
-        const isInside = e.clientY <= rect.bottom && e.clientX >= rect.left && e.clientX <= rect.right;
-        
-        if (isInside) {
-            ipcRenderer.send('set-ignore-mouse-events', false);
-            if (hasMusic && !island.classList.contains('expanded')) {
-                ipcRenderer.send('trigger-haptic');
-                ipcRenderer.send('resize-window', 540, 150);
-                island.classList.add('expanded');
-            }
+        if (currentStatus === 'PLAYING' || hasMovement) {
+            animationId = requestAnimationFrame(renderEqualizer);
         } else {
-            if (island.classList.contains('expanded')) {
-                island.classList.remove('expanded');
-                const defaultWidth = hasMusic ? 270 : 180;
-                ipcRenderer.send('resize-window', defaultWidth, 32);
-                ipcRenderer.send('set-ignore-mouse-events', true, { forward: true });
-            }
+            isAnimating = false;
+        }
+    }
+
+    function startEqualizerAnimation() {
+        if (!isAnimating && currentStatus === 'PLAYING') {
+            isAnimating = true;
+            renderEqualizer();
+        }
+    }
+ 
+    island.addEventListener('mouseenter', () => {
+        ipcRenderer.send('set-ignore-mouse-events', false);
+        if (hasMusic && !island.classList.contains('expanded')) {
+            ipcRenderer.send('trigger-haptic');
+            ipcRenderer.send('resize-window', 540, 150);
+            island.classList.add('expanded');
         }
     });
 
-    document.getElementById('albumArt').addEventListener('click', () => {
+    island.addEventListener('mouseleave', () => {
+        if (island.classList.contains('expanded')) {
+            island.classList.remove('expanded');
+            const defaultWidth = hasMusic ? 270 : 180;
+            ipcRenderer.send('resize-window', defaultWidth, 32);
+            ipcRenderer.send('set-ignore-mouse-events', true, { forward: true });
+        }
+    });
+
+    albumArt.addEventListener('click', () => {
         ipcRenderer.send('open-apple-music');
     });
 
@@ -314,12 +371,12 @@
         if (currentStatus === 'PLAYING') {
             currentStatus = 'PAUSED';
             playPauseIcon.className = 'icon-play';
-            freezeEqualizer();
+            targetFull = [3, 3, 3, 3];
+            targetMini = [3, 3, 3, 3];
         } else {
             currentStatus = 'PLAYING';
             playPauseIcon.className = 'icon-pause';
-            isAnimating = true;
-            renderEqualizer();
+            startEqualizerAnimation();
         }
         ipcRenderer.send('music-control', 'playpause');
     });
@@ -342,6 +399,25 @@
             artistEl.innerText = data.artist;
             island.classList.add('music-active');
             
+            if (data.bpm && data.bpm > 0) {
+                currentSpeedDivider = Math.max(100, 300 - data.bpm);
+            } else {
+                currentSpeedDivider = 200;
+            }
+ 
+            const newSignature = `${data.title}-${data.artist}-${data.hasArt}`;
+            if (newSignature !== currentTrackSignature) {
+                currentTrackSignature = newSignature;
+                if (data.hasArt) {
+                    const freshCover = `file:///tmp/notch_cover.png?t=${Date.now()}`;
+                    miniArt.style.backgroundImage = `url('${freshCover}')`;
+                    albumArt.style.backgroundImage = `url('${freshCover}')`;
+                } else {
+                    miniArt.style.backgroundImage = 'none';
+                    albumArt.style.backgroundImage = 'none';
+                }
+            }
+
             if (!island.classList.contains('expanded')) {
                 ipcRenderer.send('resize-window', 270, 32);
             }
@@ -349,21 +425,20 @@
             currentStatus = data.status;
             if (data.status === 'PLAYING') {
                 playPauseIcon.className = 'icon-pause';
-                if (!isAnimating) {
-                    isAnimating = true;
-                    renderEqualizer();
-                }
+                startEqualizerAnimation();
             } else {
                 playPauseIcon.className = 'icon-play';
-                freezeEqualizer();
             }
         } else {
             hasMusic = false;
+            currentTrackSignature = '';
             titleEl.innerText = "Nothing Playing";
             artistEl.innerText = "Start playing music";
             island.classList.remove('music-active', 'expanded');
+            miniArt.style.backgroundImage = 'none';
+            albumArt.style.backgroundImage = 'none';
             ipcRenderer.send('resize-window', 180, 32);
-            freezeEqualizer();
+            currentStatus = 'STOPPED';
         }
     });
   </script>
