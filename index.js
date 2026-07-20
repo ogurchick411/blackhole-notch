@@ -63,6 +63,7 @@ function startMusicTicker() {
                                 set artData to raw data of artwork 1 of current track
                                 set filePath to posix path of "${coverPath}"
                                 
+                                do shell script "rm -f " & quoted form of filePath
                                 set fileRef to open for access filePath with write permission
                                 set eof fileRef to 0
                                 write artData to fileRef
@@ -105,7 +106,13 @@ function startMusicTicker() {
 
                 if (currentSignature !== lastSignature) {
                     lastSignature = currentSignature;
-                    exec(`osascript -e '${getAppleScript(true)}'`, () => {});
+                    mainWindow.webContents.send('music-track-changing');
+                    exec(`osascript -e '${getAppleScript(true)}'`, () => {
+                        setTimeout(() => {
+                            if (!mainWindow || mainWindow.isDestroyed()) return;
+                            mainWindow.webContents.send('music-art-ready');
+                        }, 50);
+                    });
                 }
 
                 mainWindow.webContents.send('music-update', {
@@ -116,8 +123,7 @@ function startMusicTicker() {
                     bpm: parseInt(parts[3]) || 0,
                     genre: parts[4] || 'Unknown',
                     position: parseFloat(parts[5]) || 0,
-                    duration: parseFloat(parts[6]) || 0,
-                    hasArt: true
+                    duration: parseFloat(parts[6]) || 0
                 });
             }
         });

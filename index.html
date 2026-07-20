@@ -62,7 +62,12 @@
       background-position: center;
       border-radius: 4px;
       opacity: 0;
-      transition: opacity 0.3s ease;
+      transition: opacity 0.25s ease, filter 0.25s ease;
+      filter: blur(4px);
+    }
+
+    .mini-art.loaded {
+      filter: blur(0px);
     }
 
     .notch.music-active .mini-art {
@@ -117,7 +122,14 @@
       flex-shrink: 0;
       margin-right: 14px;
       box-shadow: 0 4px 10px rgba(0,0,0,0.4);
-      transition: background-image 0.3s ease-in-out, transform 0.2s ease;
+      transition: opacity 0.25s ease, filter 0.25s ease;
+      opacity: 0;
+      filter: blur(6px);
+    }
+
+    .album-art-full.loaded {
+      opacity: 1;
+      filter: blur(0px);
     }
 
     .track-info {
@@ -371,7 +383,6 @@
     let isAnimating = false;
     let hasMusic = false;
     let currentStatus = 'PAUSED';
-    let currentTrackSignature = ''; 
     let currentSpeedDivider = 200; 
 
     let trackPosition = 0;
@@ -565,6 +576,25 @@
     document.getElementById('btnNext').addEventListener('click', () => { ipcRenderer.send('music-control', 'next'); });
     document.getElementById('btnPrev').addEventListener('click', () => { ipcRenderer.send('music-control', 'prev'); });
 
+    ipcRenderer.on('music-track-changing', () => {
+        miniArt.classList.remove('loaded');
+        albumArt.classList.remove('loaded');
+        miniArt.style.backgroundImage = 'none';
+        albumArt.style.backgroundImage = 'none';
+    });
+
+    ipcRenderer.on('music-art-ready', () => {
+        const freshCover = `file:///tmp/notch_cover.png?t=${Date.now()}`;
+        const imgLoader = new Image();
+        imgLoader.src = freshCover;
+        imgLoader.onload = () => {
+            miniArt.style.backgroundImage = `url('${freshCover}')`;
+            albumArt.style.backgroundImage = `url('${freshCover}')`;
+            miniArt.classList.add('loaded');
+            albumArt.classList.add('loaded');
+        };
+    });
+
     ipcRenderer.on('music-update', (event, data) => {
         const titleEl = document.getElementById('trackTitle');
         const artistEl = document.getElementById('trackArtist');
@@ -587,14 +617,6 @@
                 lastUpdateTimestamp = Date.now();
             }
 
-            const newSignature = `${data.title}-${data.artist}`;
-            if (newSignature !== currentTrackSignature) {
-                currentTrackSignature = newSignature;
-                const freshCover = `file:///tmp/notch_cover.png?t=${Date.now()}`;
-                miniArt.style.backgroundImage = `url('${freshCover}')`;
-                albumArt.style.backgroundImage = `url('${freshCover}')`;
-            }
-
             if (!island.classList.contains('expanded')) {
                 ipcRenderer.send('resize-window', 270, 32);
             }
@@ -605,7 +627,7 @@
                 island.classList.add('playing');
                 startEqualizerAnimation();
                 startSmoothTimeline();
-                startLavaAnimation();  
+                startLavaAnimation();
             } else {
                 playPauseIcon.className = 'icon-play';
                 island.classList.remove('playing');
@@ -631,12 +653,13 @@
                 cancelAnimationFrame(lavaRaf);
                 lavaRaf = null;
             }
-            currentTrackSignature = '';
             titleEl.innerText = "Nothing Playing";
             artistEl.innerText = "Start playing music";
             island.classList.remove('music-active', 'expanded');
             miniArt.style.backgroundImage = 'none';
             albumArt.style.backgroundImage = 'none';
+            miniArt.classList.remove('loaded');
+            albumArt.classList.remove('loaded');
             ipcRenderer.send('resize-window', 180, 32);
             currentStatus = 'STOPPED';
             
