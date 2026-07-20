@@ -1,16 +1,17 @@
 {
   "name": "blackhole-notch",
   "version": "1.0.0",
+  "description": "Smart Dynamic Island for Apple Music on macOS",
+  "author": "OgurchicK",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "pack": "electron-builder --dir",
     "dist": "electron-builder"
   },
-  "dependencies": {
-    "electron": "^30.0.0" 
-  },
+  "dependencies": {},
   "devDependencies": {
+    "electron": "^30.0.0",
     "electron-builder": "^24.13.3"
   },
   "build": {
