@@ -108,7 +108,7 @@
       align-items: center;
       overflow: hidden;
       white-space: nowrap;
-      max-width: 80%;
+      max-width: 360px;
     }
 
     .album-art-full {
@@ -136,21 +136,31 @@
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      width: 280px; 
+    }
+
+    .scroll-wrapper {
+      overflow: hidden;
+      width: 100%;
+      position: relative;
+      display: flex;
     }
 
     .track-title {
       font-size: 14.5px;
       font-weight: 600;
       margin-bottom: 2px;
-      text-overflow: ellipsis;
-      overflow: hidden;
+      white-space: nowrap;
+      display: inline-block;
+      transform: translateX(0);
     }
 
     .track-artist {
       font-size: 12px;
       color: rgba(255, 255, 255, 0.55);
-      text-overflow: ellipsis;
-      overflow: hidden;
+      white-space: nowrap;
+      display: inline-block;
+      transform: translateX(0);
     }
 
     .equalizer {
@@ -339,8 +349,8 @@
         <div class="meta-box">
           <div class="album-art-full" id="albumArt"></div>
           <div class="track-info">
-            <div class="track-title" id="trackTitle">Nothing Playing</div>
-            <div class="track-artist" id="trackArtist">Start playing music</div>
+            <div class="scroll-wrapper"><div class="track-title" id="trackTitle">Nothing Playing</div></div>
+            <div class="scroll-wrapper"><div class="track-artist" id="trackArtist">Start playing music</div></div>
           </div>
         </div>
         
@@ -414,6 +424,8 @@
     let miniHeights = [3, 3, 3, 3];
     let targetFull = [3, 3, 3, 3];
     let targetMini = [3, 3, 3, 3];
+
+    let scrollAnimations = [];
 
     function formatTime(seconds) {
         if (!seconds || isNaN(seconds) || seconds < 0) return "0:00";
@@ -516,6 +528,45 @@
         }, 33); 
     }
 
+    function initTextScroll(element) {
+        element.style.transition = 'none';
+        element.style.transform = 'translateX(0)';
+        
+        const parentWidth = element.parentElement.offsetWidth;
+        const elementWidth = element.scrollWidth;
+        
+        if (elementWidth > parentWidth) {
+            const maxScroll = elementWidth - parentWidth + 10;
+            const duration = maxScroll * 35; 
+            
+            element.style.transition = `transform ${duration}ms linear 1500ms`;
+            element.style.transform = `translateX(-${maxScroll}px)`;
+            
+            const onTransitionEnd = () => {
+                element.style.transition = 'none';
+                element.style.transform = 'translateX(0)';
+                setTimeout(() => {
+                    if (island.classList.contains('expanded') && currentStatus === 'PLAYING') {
+                        element.style.transition = `transform ${duration}ms linear 1500ms`;
+                        element.style.transform = `translateX(-${maxScroll}px)`;
+                    }
+                }, 1500);
+            };
+            
+            element.addEventListener('transitionend', onTransitionEnd);
+            scrollAnimations.push({ element, onTransitionEnd });
+        }
+    }
+
+    function clearTextScroll() {
+        scrollAnimations.forEach(item => {
+            item.element.removeEventListener('transitionend', item.onTransitionEnd);
+            item.element.style.transition = 'none';
+            item.element.style.transform = 'translateX(0)';
+        });
+        scrollAnimations = [];
+    }
+
     island.addEventListener('mouseenter', () => {
         ipcRenderer.send('set-ignore-mouse-events', false);
 
@@ -523,11 +574,20 @@
             ipcRenderer.send('resize-window', 540, 142); 
             island.classList.add('expanded');
             startLavaAnimation();
+            
+            setTimeout(() => {
+                clearTextScroll();
+                if (currentStatus === 'PLAYING') {
+                    initTextScroll(document.getElementById('trackTitle'));
+                    initTextScroll(document.getElementById('trackArtist'));
+                }
+            }, 360);
         }
     });
 
     island.addEventListener('mouseleave', () => {
         if (island.classList.contains('expanded') && !isDragging) {
+            clearTextScroll();
             island.classList.remove('expanded');
             if (lavaRaf) {
                 cancelAnimationFrame(lavaRaf);
@@ -595,6 +655,7 @@
     document.getElementById('btnPrev').addEventListener('click', () => { ipcRenderer.send('music-control', 'prev'); });
 
     ipcRenderer.on('music-track-changing', () => {
+        clearTextScroll();
         miniArt.classList.remove('loaded');
         albumArt.classList.remove('loaded');
         miniArt.style.backgroundImage = 'none';
@@ -619,8 +680,17 @@
 
         if (data.playing) {
             hasMusic = true;
-            titleEl.innerText = data.title;
-            artistEl.innerText = data.artist;
+            if (titleEl.innerText !== data.title || artistEl.innerText !== data.artist) {
+                clearTextScroll();
+                titleEl.innerText = data.title;
+                artistEl.innerText = data.artist;
+                if (island.classList.contains('expanded') && data.status === 'PLAYING') {
+                    setTimeout(() => {
+                        initTextScroll(titleEl);
+                        initTextScroll(artistEl);
+                    }, 50);
+                }
+            }
             island.classList.add('music-active');
             
             if (data.bpm && data.bpm > 0) {
@@ -639,33 +709,41 @@
                 ipcRenderer.send('resize-window', 270, 32);
             }
             
-            currentStatus = data.status;
-            if (data.status === 'PLAYING') {
-                playPauseIcon.className = 'icon-pause';
-                island.classList.add('playing');
-                startEqualizerAnimation();
-                startSmoothTimeline();
-                startLavaAnimation();
-            } else {
-                playPauseIcon.className = 'icon-play';
-                island.classList.remove('playing');
-                if (smoothTimelineInterval) clearInterval(smoothTimelineInterval);
-                if (lavaRaf) {
-                    cancelAnimationFrame(lavaRaf);
-                    lavaRaf = null;
+            if (currentStatus !== data.status) {
+                currentStatus = data.status;
+                if (data.status === 'PLAYING') {
+                    playPauseIcon.className = 'icon-pause';
+                    island.classList.add('playing');
+                    startEqualizerAnimation();
+                    startSmoothTimeline();
+                    startLavaAnimation();
+                    if (island.classList.contains('expanded')) {
+                        initTextScroll(titleEl);
+                        initTextScroll(artistEl);
+                    }
+                } else {
+                    playPauseIcon.className = 'icon-play';
+                    island.classList.remove('playing');
+                    clearTextScroll();
+                    if (smoothTimelineInterval) clearInterval(smoothTimelineInterval);
+                    if (lavaRaf) {
+                        cancelAnimationFrame(lavaRaf);
+                        lavaRaf = null;
+                    }
                 }
-                
-                if (!isDragging) {
-                    const progressPercent = (trackPosition / trackDuration) * 100;
-                    timelineProgress.style.width = `${progressPercent}%`;
-                    timelineHandle.style.left = `${progressPercent}%`;
-                    timeCurrent.innerText = formatTime(trackPosition);
-                    timeRemaining.innerText = `-${formatTime(trackDuration - trackPosition)}`;
-                }
+            }
+
+            if (currentStatus !== 'PLAYING' && !isDragging) {
+                const progressPercent = (trackPosition / trackDuration) * 100;
+                timelineProgress.style.width = `${progressPercent}%`;
+                timelineHandle.style.left = `${progressPercent}%`;
+                timeCurrent.innerText = formatTime(trackPosition);
+                timeRemaining.innerText = `-${formatTime(trackDuration - trackPosition)}`;
             }
         } else {
             hasMusic = false;
             island.classList.remove('playing');
+            clearTextScroll();
             if (smoothTimelineInterval) clearInterval(smoothTimelineInterval);
             if (lavaRaf) {
                 cancelAnimationFrame(lavaRaf);
