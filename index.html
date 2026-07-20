@@ -108,7 +108,7 @@
       align-items: center;
       overflow: hidden;
       white-space: nowrap;
-      max-width: 360px;
+      max-width: 80%;
     }
 
     .album-art-full {
@@ -136,31 +136,21 @@
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      width: 280px; 
-    }
-
-    .scroll-wrapper {
-      overflow: hidden;
-      width: 100%;
-      position: relative;
-      display: flex;
     }
 
     .track-title {
       font-size: 14.5px;
       font-weight: 600;
       margin-bottom: 2px;
-      white-space: nowrap;
-      display: inline-block;
-      transform: translateX(0);
+      text-overflow: ellipsis;
+      overflow: hidden;
     }
 
     .track-artist {
       font-size: 12px;
       color: rgba(255, 255, 255, 0.55);
-      white-space: nowrap;
-      display: inline-block;
-      transform: translateX(0);
+      text-overflow: ellipsis;
+      overflow: hidden;
     }
 
     .equalizer {
@@ -186,7 +176,7 @@
       background: linear-gradient(to top, #1db954, #1ed760);
       border-radius: 1px;
       height: 3px;
-      transition: height 0.2s ease, background 0.3s ease, opacity 0.3s ease;
+      transition: height 0.2s ease, opacity 0.3s ease;
     }
 
     .timeline-container {
@@ -274,38 +264,15 @@
       color: white;
       cursor: pointer;
       opacity: 0.75;
-      transition: opacity 0.2s cubic-bezier(0.25, 1, 0.5, 1), transform 0.2s cubic-bezier(0.25, 1, 0.5, 1), color 0.2s ease;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 6px;
-    }
-
-    .btn .icon-prev,
-    .btn .icon-next,
-    .btn #playPauseIcon {
-      transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+      transition: opacity 0.2s ease;
     }
 
     .btn:hover { 
       opacity: 1; 
       color: #1ed760;
     }
-
-    #btnPrev:hover .icon-prev {
-      transform: translateX(-3px);
-    }
-
-    #btnNext:hover .icon-next {
-      transform: rotate(180deg) translateX(-3px);
-    }
-
-    #btnPlayPause:hover #playPauseIcon {
-      transform: scale(1.12);
-    }
   
     .btn:active {   
-      transform: scale(0.85);
       opacity: 0.5;
     }
 
@@ -349,8 +316,8 @@
         <div class="meta-box">
           <div class="album-art-full" id="albumArt"></div>
           <div class="track-info">
-            <div class="scroll-wrapper"><div class="track-title" id="trackTitle">Nothing Playing</div></div>
-            <div class="scroll-wrapper"><div class="track-artist" id="trackArtist">Start playing music</div></div>
+            <div class="track-title" id="trackTitle">Nothing Playing</div>
+            <div class="track-artist" id="trackArtist">Start playing music</div>
           </div>
         </div>
         
@@ -425,7 +392,7 @@
     let targetFull = [3, 3, 3, 3];
     let targetMini = [3, 3, 3, 3];
 
-    let scrollAnimations = [];
+    let savedTrackData = null; 
 
     function formatTime(seconds) {
         if (!seconds || isNaN(seconds) || seconds < 0) return "0:00";
@@ -457,14 +424,11 @@
             lavaRaf = null;
             return;
         }
-
         const t = Date.now() * 0.0008; 
         const x = 50 + Math.sin(t) * 35 + Math.cos(t * 0.6) * 10;
         const y = 50 + Math.cos(t * 0.8) * 35 + Math.sin(t * 0.5) * 10;
-
         island.style.setProperty('--x', `${x}%`);
         island.style.setProperty('--y', `${y}%`);
-
         lavaRaf = requestAnimationFrame(animateLavaGlow);
     }
 
@@ -476,7 +440,6 @@
 
     function renderEqualizer() {
         let hasMovement = false;
-        
         fullBars.forEach((bar, i) => {
             const speedFactor = Date.now() / currentSpeedDivider;
             const base = [12, 15, 10, 14][i];
@@ -486,7 +449,6 @@
             bar.style.height = `${fullHeights[i]}px`;
             if (Math.abs(mixedTarget - fullHeights[i]) > 0.1) hasMovement = true;
         });
-
         miniBars.forEach((bar, i) => {
             const speedFactor = Date.now() / (currentSpeedDivider * 0.75);
             const base = [8, 10, 7, 9][i];
@@ -496,7 +458,6 @@
             bar.style.height = `${miniHeights[i]}px`;
             if (Math.abs(mixedTarget - miniHeights[i]) > 0.1) hasMovement = true;
         });
-
         if (currentStatus === 'PLAYING' || hasMovement) {
             requestAnimationFrame(renderEqualizer);
         } else {
@@ -513,13 +474,10 @@
 
     function startSmoothTimeline() {
         if (smoothTimelineInterval) clearInterval(smoothTimelineInterval);
-        
         smoothTimelineInterval = setInterval(() => {
             if (currentStatus !== 'PLAYING' || trackDuration <= 0 || isDragging) return;
-            
             const elapsed = (Date.now() - lastUpdateTimestamp) / 1000;
             const currentSmoothPos = Math.min(trackPosition + elapsed, trackDuration);
-            
             const progressPercent = (currentSmoothPos / trackDuration) * 100;
             timelineProgress.style.width = `${progressPercent}%`;
             timelineHandle.style.left = `${progressPercent}%`;
@@ -528,69 +486,18 @@
         }, 33); 
     }
 
-    function initTextScroll(element) {
-        element.style.transition = 'none';
-        element.style.transform = 'translateX(0)';
-        
-        const parentWidth = element.parentElement.offsetWidth;
-        const elementWidth = element.scrollWidth;
-        
-        if (elementWidth > parentWidth) {
-            const maxScroll = elementWidth - parentWidth + 12;
-            const duration = maxScroll * 38; 
-            let direction = 'forward';
-            
-            const runScroll = () => {
-                if (!island.classList.contains('expanded') || currentStatus !== 'PLAYING') return;
-                
-                if (direction === 'forward') {
-                    element.style.transition = `transform ${duration}ms cubic-bezier(0.42, 0, 0.58, 1) 1800ms`;
-                    element.style.transform = `translateX(-${maxScroll}px)`;
-                    direction = 'backward';
-                } else {
-                    element.style.transition = `transform ${duration}ms cubic-bezier(0.42, 0, 0.58, 1) 1800ms`;
-                    element.style.transform = 'translateX(0)';
-                    direction = 'forward';
-                }
-            };
-
-            element.addEventListener('transitionend', runScroll);
-            scrollAnimations.push({ element, onTransitionEnd: runScroll });
-            
-            setTimeout(runScroll, 50);
-        }
-    }
-
-    function clearTextScroll() {
-        scrollAnimations.forEach(item => {
-            item.element.removeEventListener('transitionend', item.onTransitionEnd);
-            item.element.style.transition = 'none';
-            item.element.style.transform = 'translateX(0)';
-        });
-        scrollAnimations = [];
-    }
-
     island.addEventListener('mouseenter', () => {
         ipcRenderer.send('set-ignore-mouse-events', false);
 
-        if (hasMusic && !island.classList.contains('expanded')) {
+        if ((hasMusic || savedTrackData) && !island.classList.contains('expanded')) {
             ipcRenderer.send('resize-window', 540, 142); 
             island.classList.add('expanded');
             startLavaAnimation();
-            
-            setTimeout(() => {
-                clearTextScroll();
-                if (currentStatus === 'PLAYING') {
-                    initTextScroll(document.getElementById('trackTitle'));
-                    initTextScroll(document.getElementById('trackArtist'));
-                }
-            }, 360);
         }
     });
 
     island.addEventListener('mouseleave', () => {
         if (island.classList.contains('expanded') && !isDragging) {
-            clearTextScroll();
             island.classList.remove('expanded');
             if (lavaRaf) {
                 cancelAnimationFrame(lavaRaf);
@@ -599,17 +506,17 @@
             island.style.removeProperty('--x');
             island.style.removeProperty('--y');
             
-            const defaultWidth = hasMusic ? 270 : 180;
+            const defaultWidth = (hasMusic || savedTrackData) ? 270 : 180;
             ipcRenderer.send('resize-window', defaultWidth, 32);
             
-            if (!hasMusic) {
+            if (!hasMusic && !savedTrackData) {
                 ipcRenderer.send('set-ignore-mouse-events', true, { forward: true });
             }
         }
     });
 
     function handleTimelineMove(e) {
-        if (!hasMusic || trackDuration <= 0) return;
+        if ((!hasMusic && !savedTrackData) || trackDuration <= 0) return;
         const bar = document.querySelector('.timeline-bar');
         const barRect = bar.getBoundingClientRect();
         const clickX = e.clientX - barRect.left;
@@ -621,7 +528,6 @@
         const calculatedTime = trackDuration * percent;
         timeCurrent.innerText = formatTime(calculatedTime);
         timeRemaining.innerText = `-${formatTime(trackDuration - calculatedTime)}`;
-        
         return calculatedTime;
     }
 
@@ -631,7 +537,6 @@
         const targetTime = handleTimelineMove(e);
         
         function onMouseMove(moveEvent) { handleTimelineMove(moveEvent); }
-        
         function onMouseUp(upEvent) {
             isDragging = false;
             timelineContainer.classList.remove('dragging');
@@ -639,11 +544,9 @@
             ipcRenderer.send('music-seek', finalTime);
             trackPosition = finalTime;
             lastUpdateTimestamp = Date.now();
-            
             window.removeEventListener('mousemove', onMouseMove);
             window.removeEventListener('mouseup', onMouseUp);
         }
-        
         window.addEventListener('mousemove', onMouseMove);
         window.addEventListener('mouseup', onMouseUp);
     });
@@ -658,7 +561,6 @@
     document.getElementById('btnPrev').addEventListener('click', () => { ipcRenderer.send('music-control', 'prev'); });
 
     ipcRenderer.on('music-track-changing', () => {
-        clearTextScroll();
         miniArt.classList.remove('loaded');
         albumArt.classList.remove('loaded');
         miniArt.style.backgroundImage = 'none';
@@ -683,17 +585,17 @@
 
         if (data.playing) {
             hasMusic = true;
-            if (titleEl.innerText !== data.title || artistEl.innerText !== data.artist) {
-                clearTextScroll();
-                titleEl.innerText = data.title;
-                artistEl.innerText = data.artist;
-                if (island.classList.contains('expanded') && data.status === 'PLAYING') {
-                    setTimeout(() => {
-                        initTextScroll(titleEl);
-                        initTextScroll(artistEl);
-                    }, 50);
-                }
-            }
+            savedTrackData = {
+                title: data.title,
+                artist: data.artist,
+                position: data.position,
+                duration: data.duration,
+                bpm: data.bpm,
+                status: data.status
+            };
+
+            titleEl.innerText = data.title;
+            artistEl.innerText = data.artist;
             island.classList.add('music-active');
             
             if (data.bpm && data.bpm > 0) {
@@ -712,60 +614,68 @@
                 ipcRenderer.send('resize-window', 270, 32);
             }
             
-            if (currentStatus !== data.status) {
-                currentStatus = data.status;
-                if (data.status === 'PLAYING') {
-                    playPauseIcon.className = 'icon-pause';
-                    island.classList.add('playing');
-                    startEqualizerAnimation();
-                    startSmoothTimeline();
-                    startLavaAnimation();
-                    if (island.classList.contains('expanded')) {
-                        initTextScroll(titleEl);
-                        initTextScroll(artistEl);
-                    }
-                } else {
-                    playPauseIcon.className = 'icon-play';
-                    island.classList.remove('playing');
-                    clearTextScroll();
-                    if (smoothTimelineInterval) clearInterval(smoothTimelineInterval);
-                    if (lavaRaf) {
-                        cancelAnimationFrame(lavaRaf);
-                        lavaRaf = null;
-                    }
+            currentStatus = data.status;
+            if (data.status === 'PLAYING') {
+                playPauseIcon.className = 'icon-pause';
+                island.classList.add('playing');
+                startEqualizerAnimation();
+                startSmoothTimeline();
+                startLavaAnimation();
+            } else {
+                playPauseIcon.className = 'icon-play';
+                island.classList.remove('playing');
+                if (smoothTimelineInterval) clearInterval(smoothTimelineInterval);
+                if (lavaRaf) {
+                    cancelAnimationFrame(lavaRaf);
+                    lavaRaf = null;
                 }
-            }
-
-            if (currentStatus !== 'PLAYING' && !isDragging) {
-                const progressPercent = (trackPosition / trackDuration) * 100;
-                timelineProgress.style.width = `${progressPercent}%`;
-                timelineHandle.style.left = `${progressPercent}%`;
-                timeCurrent.innerText = formatTime(trackPosition);
-                timeRemaining.innerText = `-${formatTime(trackDuration - trackPosition)}`;
+                
+                if (!isDragging) {
+                    trackPosition = data.position; 
+                    lastUpdateTimestamp = Date.now();
+                    const progressPercent = (trackPosition / trackDuration) * 100;
+                    timelineProgress.style.width = `${progressPercent}%`;
+                    timelineHandle.style.left = `${progressPercent}%`;
+                    timeCurrent.innerText = formatTime(trackPosition);
+                    timeRemaining.innerText = `-${formatTime(trackDuration - trackPosition)}`;
+                }
             }
         } else {
             hasMusic = false;
             island.classList.remove('playing');
-            clearTextScroll();
             if (smoothTimelineInterval) clearInterval(smoothTimelineInterval);
             if (lavaRaf) {
                 cancelAnimationFrame(lavaRaf);
                 lavaRaf = null;
             }
-            titleEl.innerText = "Nothing Playing";
-            artistEl.innerText = "Start playing music";
-            island.classList.remove('music-active', 'expanded');
-            miniArt.style.backgroundImage = 'none';
-            albumArt.style.backgroundImage = 'none';
-            miniArt.classList.remove('loaded');
-            albumArt.classList.remove('loaded');
-            ipcRenderer.send('resize-window', 180, 32);
-            currentStatus = 'STOPPED';
             
-            timelineProgress.style.width = '0%';
-            timelineHandle.style.left = '0%';
-            timeCurrent.innerText = "0:00";
-            timeRemaining.innerText = "-0:00";
+            playPauseIcon.className = 'icon-play';
+            currentStatus = 'PAUSED';
+
+            if (savedTrackData) {
+                titleEl.innerText = savedTrackData.title;
+                artistEl.innerText = savedTrackData.artist;
+                trackPosition = savedTrackData.position;
+                trackDuration = savedTrackData.duration;
+                
+                const progressPercent = (trackPosition / trackDuration) * 100;
+                timelineProgress.style.width = `${progressPercent}%`;
+                timelineHandle.style.left = `${progressPercent}%`;
+                timeCurrent.innerText = formatTime(trackPosition);
+                timeRemaining.innerText = `-${formatTime(trackDuration - trackPosition)}`;
+            } else {
+                titleEl.innerText = "Nothing Playing";
+                artistEl.innerText = "Start playing music";
+                timelineProgress.style.width = '0%';
+                timelineHandle.style.left = '0%';
+                timeCurrent.innerText = "0:00";
+                timeRemaining.innerText = "-0:00";
+            }
+
+            if (!island.classList.contains('expanded')) {
+                island.classList.remove('music-active');
+                ipcRenderer.send('resize-window', 180, 32);
+            }
         }
     });
   </script>
