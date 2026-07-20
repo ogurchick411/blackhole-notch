@@ -536,25 +536,28 @@
         const elementWidth = element.scrollWidth;
         
         if (elementWidth > parentWidth) {
-            const maxScroll = elementWidth - parentWidth + 10;
-            const duration = maxScroll * 35; 
+            const maxScroll = elementWidth - parentWidth + 12;
+            const duration = maxScroll * 38; 
+            let direction = 'forward';
             
-            element.style.transition = `transform ${duration}ms linear 1500ms`;
-            element.style.transform = `translateX(-${maxScroll}px)`;
-            
-            const onTransitionEnd = () => {
-                element.style.transition = 'none';
-                element.style.transform = 'translateX(0)';
-                setTimeout(() => {
-                    if (island.classList.contains('expanded') && currentStatus === 'PLAYING') {
-                        element.style.transition = `transform ${duration}ms linear 1500ms`;
-                        element.style.transform = `translateX(-${maxScroll}px)`;
-                    }
-                }, 1500);
+            const runScroll = () => {
+                if (!island.classList.contains('expanded') || currentStatus !== 'PLAYING') return;
+                
+                if (direction === 'forward') {
+                    element.style.transition = `transform ${duration}ms cubic-bezier(0.42, 0, 0.58, 1) 1800ms`;
+                    element.style.transform = `translateX(-${maxScroll}px)`;
+                    direction = 'backward';
+                } else {
+                    element.style.transition = `transform ${duration}ms cubic-bezier(0.42, 0, 0.58, 1) 1800ms`;
+                    element.style.transform = 'translateX(0)';
+                    direction = 'forward';
+                }
             };
+
+            element.addEventListener('transitionend', runScroll);
+            scrollAnimations.push({ element, onTransitionEnd: runScroll });
             
-            element.addEventListener('transitionend', onTransitionEnd);
-            scrollAnimations.push({ element, onTransitionEnd });
+            setTimeout(runScroll, 50);
         }
     }
 
