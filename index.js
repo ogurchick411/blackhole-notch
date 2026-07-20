@@ -5,6 +5,7 @@ const fs = require('fs');
 
 let mainWindow;
 const coverPath = '/tmp/notch_cover.png';
+let lastSignature = '';
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -39,7 +40,7 @@ function createWindow() {
 }
 
 function startMusicTicker() {
-    const appleScript = `
+    const getAppleScript = (fetchArt) => `
         tell application "System Events"
             set processList to (name of every process)
         end tell
@@ -55,22 +56,24 @@ function startMusicTicker() {
                     set totalDur to duration of current track
                     
                     set hasArt to "false"
-                    try
-                        if (count of artworks of current track) > 0 then
-                            set hasArt to "true"
-                            set artData to raw data of artwork 1 of current track
-                            set filePath to posix path of "${coverPath}"
-                            
-                            set fileRef to open for access filePath with write permission
-                            set eof fileRef to 0
-                            write artData to fileRef
-                            close access fileRef
-                        end if
-                    on error
+                    if ${fetchArt} is true then
                         try
-                            close access file "${coverPath}"
+                            if (count of artworks of current track) > 0 then
+                                set hasArt to "true"
+                                set artData to raw data of artwork 1 of current track
+                                set filePath to posix path of "${coverPath}"
+                                
+                                set fileRef to open for access filePath with write permission
+                                set eof fileRef to 0
+                                write artData to fileRef
+                                close access fileRef
+                            end if
+                        on error
+                            try
+                                close access file "${coverPath}"
+                            end try
                         end try
-                    end try
+                    end if
                     
                     set stateStr to "PLAYING"
                     if playerState is paused then set stateStr to "PAUSED"
@@ -87,24 +90,34 @@ function startMusicTicker() {
     setInterval(() => {
         if (!mainWindow || mainWindow.isDestroyed()) return;
 
-        exec(`osascript -e '${appleScript}'`, (err, stdout) => {
+        exec(`osascript -e '${getAppleScript(false)}'`, (err, stdout) => {
             if (err) return;
             const response = stdout.trim();
             
             if (response === "NOT_RUNNING" || response === "NOT_PLAYING" || response === "") {
                 mainWindow.webContents.send('music-update', { playing: false, status: 'STOPPED' });
+                lastSignature = '';
             } else {
                 const parts = response.split('|||');
+                const title = parts[0] || 'Unknown Track';
+                const artist = parts[1] || 'Unknown Artist';
+                const currentSignature = `${title}-${artist}`;
+
+                if (currentSignature !== lastSignature) {
+                    lastSignature = currentSignature;
+                    exec(`osascript -e '${getAppleScript(true)}'`, () => {});
+                }
+
                 mainWindow.webContents.send('music-update', {
                     playing: true,
-                    title: parts[0] || 'Unknown Track',
-                    artist: parts[1] || 'Unknown Artist',
+                    title: title,
+                    artist: artist,
                     status: parts[2] || 'PAUSED',
                     bpm: parseInt(parts[3]) || 0,
                     genre: parts[4] || 'Unknown',
                     position: parseFloat(parts[5]) || 0,
                     duration: parseFloat(parts[6]) || 0,
-                    hasArt: parts[7] === "true"
+                    hasArt: true
                 });
             }
         });
@@ -146,15 +159,10 @@ ipcMain.on('music-control', (event, action) => {
     if (action === 'playpause') cmd = 'playpause';
     if (action === 'next') cmd = 'next track';
     if (action === 'prev') cmd = 'previous track';
-    if (cmd) exec(`osascript -e 'tell application "Music" to ${cmd}'`);
-});
-
-ipcMain.on('music-control', (event, action) => {
-    let cmd = '';
-    if (action === 'playpause') cmd = 'playpause';
-    if (action === 'next') cmd = 'next track';
-    if (action === 'prev') cmd = 'previous track';
-    if (cmd) exec(`osascript -e 'tell application "Music" to ${cmd}'`);
+    
+    if (cmd) {
+        exec(`osascript -e 'tell application "Music" to ${cmd}'`);
+    }
 });
 
 ipcMain.on('music-seek', (event, seekTime) => {
