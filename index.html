@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <style>
+  <style> 
     :root {
       --accent-start: #1db954;
       --accent-end: #1ed760;
@@ -58,7 +58,8 @@
     }
 
     .notch.expanded.playing {
-      background: radial-gradient(circle at var(--x, 30%) var(--y, 30%), var(--glow-1) 0%, var(--glow-2) 45%, #000000 70%) !important;
+      background: radial-gradient(circle at var(--x, 30%) var(--y, 30%), 
+      var(--glow-1) 0%, var(--glow-2) 45%, #000000 70%) !important;
     }
 
     .mini-art {
@@ -176,6 +177,7 @@
       opacity: 0;
       transition: opacity 0.3s ease;
     }
+
     .notch.music-active .mini-eq { opacity: 1; }
 
     .bar {
@@ -236,6 +238,7 @@
       height: 4.5px;
       background: rgba(255, 255, 255, 0.25);
     }
+
     .timeline-bar-wrapper:hover .timeline-handle,
     .timeline-container.dragging .timeline-handle {
       transform: translate(-50%, -50%) scale(1);
@@ -289,6 +292,7 @@
       background: currentColor;
       clip-path: polygon(0% 50%, 50% 0%, 50% 35%, 100% 0%, 100% 100%, 50% 65%, 50% 100%);
     }
+
     .icon-next { transform: rotate(180deg); }
 
     .icon-play {
@@ -304,6 +308,7 @@
       display: flex;
       gap: 4px;
     }
+
     .icon-pause::before, .icon-pause::after {
       content: '';
       width: 3.5px;
@@ -714,7 +719,7 @@
                 ipcRenderer.send('resize-window', 180, 32); 
             }
         }
-    }); 
+    });
   </script>
-</body> 
+</body>
 </html> 
