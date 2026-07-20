@@ -3,6 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <style>
+    :root {
+      --accent-start: #1db954;
+      --accent-end: #1ed760;
+      --glow-1: #073b18;
+      --glow-2: #021a0a;
+    }
+
     body {
       margin: 0;
       padding: 0;
@@ -51,7 +58,7 @@
     }
 
     .notch.expanded.playing {
-      background: radial-gradient(circle at var(--x, 30%) var(--y, 30%), #073b18 0%, #021a0a 45%, #000000 70%) !important;
+      background: radial-gradient(circle at var(--x, 30%) var(--y, 30%), var(--glow-1) 0%, var(--glow-2) 45%, #000000 70%) !important;
     }
 
     .mini-art {
@@ -173,7 +180,7 @@
 
     .bar {
       width: 2px;
-      background: linear-gradient(to top, #1db954, #1ed760);
+      background: linear-gradient(to top, var(--accent-start), var(--accent-end));
       border-radius: 1px;
       height: 3px;
       transition: height 0.2s ease, opacity 0.3s ease;
@@ -207,7 +214,7 @@
       top: 0;
       height: 100%;
       width: 0%;
-      background: #1db954;
+      background: var(--accent-start);
       border-radius: 99px;
     }
 
@@ -269,7 +276,7 @@
 
     .btn:hover { 
       opacity: 1; 
-      color: #1ed760;
+      color: var(--accent-end);
     }
   
     .btn:active {   
@@ -394,6 +401,14 @@
 
     let savedTrackData = null; 
 
+    const themes = {
+        'spotify-green':    { start: '#1db954', end: '#1ed760', glow1: '#073b18', glow2: '#021a0a' },
+        'cyber-violet':     { start: '#a855f7', end: '#c084fc', glow1: '#2e1065', glow2: '#0f172a' },
+        'vampire-blood':    { start: '#dc2626', end: '#ef4444', glow1: '#450a0a', glow2: '#000000' },
+        'monochrome-noir':  { start: '#ffffff', end: '#e2e8f0', glow1: '#1e293b', glow2: '#0f172a' },
+        'aurora-borealis':  { start: '#06b6d4', end: '#22d3ee', glow1: '#042f2e', glow2: '#0f172a' }
+    };
+
     function formatTime(seconds) {
         if (!seconds || isNaN(seconds) || seconds < 0) return "0:00";
         const mins = Math.floor(seconds / 60);
@@ -486,6 +501,16 @@
         }, 33); 
     }
 
+    function applyPresetTheme(themeName) {
+        const theme = themes[themeName];
+        if (!theme) return;
+        const root = document.documentElement;
+        root.style.setProperty('--accent-start', theme.start);
+        root.style.setProperty('--accent-end', theme.end);
+        root.style.setProperty('--glow-1', theme.glow1);
+        root.style.setProperty('--glow-2', theme.glow2);
+    }
+
     island.addEventListener('mouseenter', () => {
         ipcRenderer.send('set-ignore-mouse-events', false);
 
@@ -551,7 +576,15 @@
         window.addEventListener('mouseup', onMouseUp);
     });
 
-    albumArt.addEventListener('click', () => { ipcRenderer.send('open-apple-music'); });
+    albumArt.addEventListener('click', () => { 
+        const themeKeys = Object.keys(themes);
+        const currentStart = document.documentElement.style.getPropertyValue('--accent-start').trim() || '#1db954';
+        let currentKeyIndex = themeKeys.findIndex(key => themes[key].start === currentStart);
+        let nextIndex = (currentKeyIndex + 1) % themeKeys.length;
+        applyPresetTheme(themeKeys[nextIndex]);
+        
+        ipcRenderer.send('open-apple-music'); 
+    });
 
     document.getElementById('btnPlayPause').addEventListener('click', () => {
         ipcRenderer.send('music-control', 'playpause');
@@ -577,6 +610,10 @@
             miniArt.classList.add('loaded');
             albumArt.classList.add('loaded');
         };
+    });
+
+    ipcRenderer.on('change-theme', (event, themeName) => {
+        applyPresetTheme(themeName);
     });
 
     ipcRenderer.on('music-update', (event, data) => {
