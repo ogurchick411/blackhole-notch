@@ -1,16 +1,29 @@
 {
   "name": "blackhole-notch",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
+  "dependencies": {
+    "electron": "^30.0.0" 
+  },
   "devDependencies": {
-    "electron": "^43.1.1"
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.ogurchick.blackhole.notch",
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": ["dmg", "zip"]
+    },
+    "win": {
+      "target": ["nsis", "zip"]
+    },
+    "directories": {
+      "output": "dist"
+    }
   }
 }
