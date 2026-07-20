@@ -2,8 +2,8 @@
   "name": "blackhole-notch",
   "version": "1.0.0",
   "description": "Smart Dynamic Island for Apple Music on macOS",
-  "author": "OgurchicK",
-  "main": "main.js",
+  "author": "Denys Zheltobriukh",
+  "main": "index.js",
   "scripts": {
     "start": "electron .",
     "pack": "electron-builder --dir",
@@ -16,6 +16,11 @@
   },
   "build": {
     "appId": "com.ogurchick.blackhole.notch",
+    "files": [
+      "index.html",
+      "index.js",
+      "package.json"
+    ],
     "mac": {
       "category": "public.app-category.utilities",
       "target": ["dmg", "zip"]
