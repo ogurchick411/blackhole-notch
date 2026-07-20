@@ -560,20 +560,6 @@
     albumArt.addEventListener('click', () => { ipcRenderer.send('open-apple-music'); });
 
     document.getElementById('btnPlayPause').addEventListener('click', () => {
-        if (currentStatus === 'PLAYING') {
-            currentStatus = 'PAUSED';
-            playPauseIcon.className = 'icon-play';
-            if (lavaRaf) {
-                cancelAnimationFrame(lavaRaf);
-                lavaRaf = null;
-            }
-        } else {
-            currentStatus = 'PLAYING';
-            playPauseIcon.className = 'icon-pause';
-            lastUpdateTimestamp = Date.now();
-            startEqualizerAnimation();
-            startLavaAnimation();
-        }
         ipcRenderer.send('music-control', 'playpause');
     });
 
@@ -620,7 +606,7 @@
                 island.classList.add('playing');
                 startEqualizerAnimation();
                 startSmoothTimeline();
-                startLavaAnimation();
+                startLavaAnimation();  
             } else {
                 playPauseIcon.className = 'icon-play';
                 island.classList.remove('playing');
