@@ -44,44 +44,84 @@ function startMusicTicker() {
         tell application "System Events"
             set processList to (name of every process)
         end tell
+        
+        set activeApp to ""
         if processList contains "Music" then
             tell application "Music"
-                set playerState to player state
-                if playerState is playing or playerState is paused then
-                    set trackName to name of current track
-                    set trackArtist to artist of current track
-                    set trackBPM to bpm of current track
-                    set trackGenre to genre of current track
-                    set curPos to player position
-                    set totalDur to duration of current track
-                    
-                    set hasArt to "false"
-                    if ${fetchArt} is true then
-                        try
-                            if (count of artworks of current track) > 0 then
-                                set hasArt to "true"
-                                set artData to raw data of artwork 1 of current track
-                                set filePath to posix path of "${coverPath}"
-                                
-                                do shell script "rm -f " & quoted form of filePath
-                                set fileRef to open for access filePath with write permission
-                                set eof fileRef to 0
-                                write artData to fileRef
-                                close access fileRef
-                            end if
-                        on error
-                            try
-                                close access file "${coverPath}"
-                            end try
-                        end try
-                    end if
-                    
-                    set stateStr to "PLAYING"
-                    if playerState is paused then set stateStr to "PAUSED"
-                    return trackName & "|||" & trackArtist & "|||" & stateStr & "|||" & trackBPM & "|||" & trackGenre & "|||" & curPos & "|||" & totalDur & "|||" & hasArt
-                else
-                    return "NOT_PLAYING"
+                if player state is playing or player state is paused then
+                    set activeApp to "Music"
                 end if
+            end tell
+        end if
+        
+        if activeApp is "" and processList contains "Spotify" then
+            tell application "Spotify"
+                if player state is playing or player state is paused then
+                    set activeApp to "Spotify"
+                end if
+            end tell
+        end if
+
+        if activeApp is "Music" then
+            tell application "Music"
+                set playerState to player state
+                set trackName to name of current track
+                set trackArtist to artist of current track
+                set trackBPM to bpm of current track
+                set trackGenre to genre of current track
+                set curPos to player position
+                set totalDur to duration of current track
+                
+                set hasArt to "false"
+                if ${fetchArt} is true then
+                    try
+                        if (count of artworks of current track) > 0 then
+                            set hasArt to "true"
+                            set artData to raw data of artwork 1 of current track
+                            set filePath to posix path of "${coverPath}"
+                            
+                            do shell script "rm -f " & quoted form of filePath
+                            set fileRef to open for access filePath with write permission
+                            set eof fileRef to 0
+                            write artData to fileRef
+                            close access fileRef
+                        end if
+                    on error
+                        try
+                            close access file "${coverPath}"
+                        end try
+                    end try
+                end if
+                
+                set stateStr to "PLAYING"
+                if playerState is paused then set stateStr to "PAUSED"
+                return trackName & "|||" & trackArtist & "|||" & stateStr & "|||" & trackBPM & "|||" & trackGenre & "|||" & curPos & "|||" & totalDur & "|||" & hasArt & "|||Music"
+            end tell
+        else if activeApp is "Spotify" then
+            tell application "Spotify"
+                set playerState to player state
+                set trackName to name of current track
+                set trackArtist to artist of current track
+                set trackBPM to 0
+                set trackGenre to "Unknown"
+                set curPos to player position
+                set totalDur to (duration of current track) / 1000
+                
+                set hasArt to "false"
+                if ${fetchArt} is true then
+                    try
+                        set artworkUrl to artwork url of current track
+                        if artworkUrl is not "" then
+                            set hasArt to "true"
+                            set filePath to posix path of "${coverPath}"
+                            do shell script "curl -s -o " & quoted form of filePath & " " & quoted form of artworkUrl
+                        end if
+                    end try
+                end if
+                
+                set stateStr to "PLAYING"
+                if playerState is paused then set stateStr to "PAUSED"
+                return trackName & "|||" & trackArtist & "|||" & stateStr & "|||" & trackBPM & "|||" & trackGenre & "|||" & curPos & "|||" & totalDur & "|||" & hasArt & "|||Spotify"
             end tell
         else
             return "NOT_RUNNING"
@@ -102,7 +142,8 @@ function startMusicTicker() {
                 const parts = response.split('|||');
                 const title = parts[0] || 'Unknown Track';
                 const artist = parts[1] || 'Unknown Artist';
-                const currentSignature = `${title}-${artist}`;
+                const player = parts[8] || 'Music';
+                const currentSignature = `${title}-${artist}-${player}`;
 
                 if (currentSignature !== lastSignature) {
                     lastSignature = currentSignature;
@@ -123,7 +164,8 @@ function startMusicTicker() {
                     bpm: parseInt(parts[3]) || 0,
                     genre: parts[4] || 'Unknown',
                     position: parseFloat(parts[5]) || 0,
-                    duration: parseFloat(parts[6]) || 0
+                    duration: parseFloat(parts[6]) || 0,
+                    player: player
                 });
             }
         });
@@ -131,6 +173,11 @@ function startMusicTicker() {
 }
 
 app.whenReady().then(() => {
+    app.setLoginItemSettings({
+        openAtLogin: true,
+        openAsHidden: false
+    });
+
     if (process.platform === 'darwin') {
         app.dock.hide();
     }
@@ -158,7 +205,17 @@ ipcMain.on('set-ignore-mouse-events', (event, ignore, options) => {
     mainWindow.setIgnoreMouseEvents(ignore, options);
 });
 
-ipcMain.on('open-apple-music', () => { exec('open -a "Music"'); });
+ipcMain.on('open-apple-music', () => { 
+    const script = `
+        tell application "System Events" to set processList to (name of every process)
+        if processList contains "Spotify" then
+            tell application "Spotify" to activate
+        else
+            tell application "Music" to activate
+        end if
+    `;
+    exec(`osascript -e '${script}'`);
+});
 
 ipcMain.on('music-control', (event, action) => {
     let cmd = '';
@@ -167,10 +224,26 @@ ipcMain.on('music-control', (event, action) => {
     if (action === 'prev') cmd = 'previous track';
     
     if (cmd) {
-        exec(`osascript -e 'tell application "Music" to ${cmd}'`);
+        const script = `
+            tell application "System Events" to set processList to (name of every process)
+            if processList contains "Spotify" then
+                tell application "Spotify" to ${cmd}
+            else if processList contains "Music" then
+                tell application "Music" to ${cmd}
+            end if
+        `;
+        exec(`osascript -e '${script}'`);
     }
 });
 
 ipcMain.on('music-seek', (event, seekTime) => {
-    exec(`osascript -e 'tell application "Music" to set player position to ${seekTime}'`);
+    const script = `
+        tell application "System Events" to set processList to (name of every process)
+        if processList contains "Spotify" then
+            tell application "Spotify" to set player position to ${seekTime}
+        else if processList contains "Music" then
+            tell application "Music" to set player position to ${seekTime}
+        end if
+    `;
+    exec(`osascript -e '${script}'`);
 });
