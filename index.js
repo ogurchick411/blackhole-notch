@@ -1,9 +1,10 @@
-const { app, BrowserWindow, ipcMain, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, Tray, Menu } = require('electron');
 const path = require('path');
 const { exec } = require('child_process');
 const fs = require('fs');
 
 let mainWindow;
+let tray;
 const coverPath = '/tmp/notch_cover.png';
 let lastSignature = '';
 
@@ -19,6 +20,7 @@ function createWindow() {
         hasShadow: false,
         alwaysOnTop: true,
         type: 'panel',
+        show: false,
         enableLargerThanScreen: true,
         webPreferences: {
             nodeIntegration: true,
@@ -39,6 +41,40 @@ function createWindow() {
     mainWindow.setIgnoreMouseEvents(true, { forward: true });
 }
 
+function createTray() {
+    tray = new Tray(path.join(__dirname, 'icon.png'));
+    
+    const contextMenu = Menu.buildFromTemplate([
+        { label: 'Blackhole Notch v1.0', enabled: false },
+        { type: 'separator' },
+        { 
+            label: 'Launch at Login', 
+            type: 'checkbox', 
+            checked: app.getLoginItemSettings().openAtLogin,
+            click: (item) => {
+                app.setLoginItemSettings({ openAtLogin: item.checked });
+            }
+        },
+        { type: 'separator' },
+        { 
+            label: 'Reload Widget', 
+            click: () => {
+                if (mainWindow) mainWindow.reload();
+            } 
+        },
+        { 
+            label: 'Quit', 
+            click: () => {
+                app.isQuitting = true;
+                app.quit();
+            } 
+        }
+    ]);
+
+    tray.setToolTip('Blackhole Notch');
+    tray.setContextMenu(contextMenu);
+}
+
 function startMusicTicker() {
     const getAppleScript = (fetchArt) => `
         tell application "System Events"
@@ -48,18 +84,14 @@ function startMusicTicker() {
         set activeApp to ""
         if processList contains "Music" then
             tell application "Music"
-                if player state is playing or player state is paused then
-                    set activeApp to "Music"
-                end if
-            end tell
+                if player state is playing then set activeApp to "Music"
+            end if
         end if
         
         if activeApp is "" and processList contains "Spotify" then
             tell application "Spotify"
-                if player state is playing or player state is paused then
-                    set activeApp to "Spotify"
-                end if
-            end tell
+                if player state is playing then set activeApp to "Spotify"
+            end if
         end if
 
         if activeApp is "Music" then
@@ -79,7 +111,6 @@ function startMusicTicker() {
                             set hasArt to "true"
                             set artData to raw data of artwork 1 of current track
                             set filePath to posix path of "${coverPath}"
-                            
                             do shell script "rm -f " & quoted form of filePath
                             set fileRef to open for access filePath with write permission
                             set eof fileRef to 0
@@ -132,13 +163,20 @@ function startMusicTicker() {
         if (!mainWindow || mainWindow.isDestroyed()) return;
 
         exec(`osascript -e '${getAppleScript(false)}'`, (err, stdout) => {
-            if (err) return;
+            if (err || !stdout) return;
             const response = stdout.trim();
             
             if (response === "NOT_RUNNING" || response === "NOT_PLAYING" || response === "") {
+                if (mainWindow.isVisible()) {
+                    mainWindow.hide();
+                }
                 mainWindow.webContents.send('music-update', { playing: false, status: 'STOPPED' });
                 lastSignature = '';
             } else {
+                if (!mainWindow.isVisible()) {
+                    mainWindow.show();
+                }
+
                 const parts = response.split('|||');
                 const title = parts[0] || 'Unknown Track';
                 const artist = parts[1] || 'Unknown Artist';
@@ -182,6 +220,7 @@ app.whenReady().then(() => {
         app.dock.hide();
     }
     createWindow();
+    createTray();
     startMusicTicker();
 });
 
