@@ -20,7 +20,7 @@ function createWindow() {
         hasShadow: false,
         alwaysOnTop: true,
         type: 'panel',
-        show: false,
+        show: true,
         enableLargerThanScreen: true,
         webPreferences: {
             nodeIntegration: true,
@@ -42,37 +42,31 @@ function createWindow() {
 }
 
 function createTray() {
-    tray = new Tray(path.join(__dirname, 'icon.png'));
-    
-    const contextMenu = Menu.buildFromTemplate([
-        { label: 'Blackhole Notch v1.0', enabled: false },
-        { type: 'separator' },
-        { 
-            label: 'Launch at Login', 
-            type: 'checkbox', 
-            checked: app.getLoginItemSettings().openAtLogin,
-            click: (item) => {
-                app.setLoginItemSettings({ openAtLogin: item.checked });
-            }
-        },
-        { type: 'separator' },
-        { 
-            label: 'Reload Widget', 
-            click: () => {
-                if (mainWindow) mainWindow.reload();
-            } 
-        },
-        { 
-            label: 'Quit', 
-            click: () => {
-                app.isQuitting = true;
-                app.quit();
-            } 
-        }
-    ]);
+    let iconPath = path.join(__dirname, 'build', 'icon.png');
+    if (!fs.existsSync(iconPath)) {
+        iconPath = path.join(__dirname, 'icon.png');
+    }
 
-    tray.setToolTip('Blackhole Notch');
-    tray.setContextMenu(contextMenu);
+    if (!fs.existsSync(iconPath)) return;
+
+    try {
+        tray = new Tray(iconPath);
+        const contextMenu = Menu.buildFromTemplate([
+            { label: 'Blackhole Notch v1.0', enabled: false },
+            { type: 'separator' },
+            { 
+                label: 'Launch at Login', 
+                type: 'checkbox', 
+                checked: app.getLoginItemSettings().openAtLogin,
+                click: (item) => app.setLoginItemSettings({ openAtLogin: item.checked })
+            },
+            { type: 'separator' },
+            { label: 'Reload Widget', click: () => { if (mainWindow) mainWindow.reload(); } },
+            { label: 'Quit', click: () => { app.isQuitting = true; app.quit(); } }
+        ]);
+        tray.setToolTip('Blackhole Notch');
+        tray.setContextMenu(contextMenu);
+    } catch (e) {}
 }
 
 function startMusicTicker() {
@@ -84,14 +78,18 @@ function startMusicTicker() {
         set activeApp to ""
         if processList contains "Music" then
             tell application "Music"
-                if player state is playing then set activeApp to "Music"
-            end if
+                try
+                    if player state is playing or player state is paused then set activeApp to "Music"
+                end try
+            end tell
         end if
         
         if activeApp is "" and processList contains "Spotify" then
             tell application "Spotify"
-                if player state is playing then set activeApp to "Spotify"
-            end if
+                try
+                    if player state is playing or player state is paused then set activeApp to "Spotify"
+                end try
+            end tell
         end if
 
         if activeApp is "Music" then
@@ -167,16 +165,9 @@ function startMusicTicker() {
             const response = stdout.trim();
             
             if (response === "NOT_RUNNING" || response === "NOT_PLAYING" || response === "") {
-                if (mainWindow.isVisible()) {
-                    mainWindow.hide();
-                }
                 mainWindow.webContents.send('music-update', { playing: false, status: 'STOPPED' });
                 lastSignature = '';
             } else {
-                if (!mainWindow.isVisible()) {
-                    mainWindow.show();
-                }
-
                 const parts = response.split('|||');
                 const title = parts[0] || 'Unknown Track';
                 const artist = parts[1] || 'Unknown Artist';
@@ -242,18 +233,6 @@ ipcMain.on('resize-window', (event, width, height) => {
 ipcMain.on('set-ignore-mouse-events', (event, ignore, options) => {
     if (!mainWindow || mainWindow.isDestroyed()) return;
     mainWindow.setIgnoreMouseEvents(ignore, options);
-});
-
-ipcMain.on('open-apple-music', () => { 
-    const script = `
-        tell application "System Events" to set processList to (name of every process)
-        if processList contains "Spotify" then
-            tell application "Spotify" to activate
-        else
-            tell application "Music" to activate
-        end if
-    `;
-    exec(`osascript -e '${script}'`);
 });
 
 ipcMain.on('music-control', (event, action) => {

@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <link rel="stylesheet" href="style.css">
   <meta charset="UTF-8">
-  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
@@ -14,8 +14,8 @@
         <div class="meta-box">
           <div class="album-art-full" id="albumArt"></div>
           <div class="track-info">
-            <div class="track-title" id="trackTitle"></div>
-            <div class="track-artist" id="trackArtist"></div>
+            <div class="track-title" id="trackTitle">Nothing Playing</div>
+            <div class="track-artist" id="trackArtist">Start playing music</div>
           </div>
         </div>
         
@@ -56,56 +56,6 @@
       <div class="bar"></div>
     </div>
   </div>
-
-  <script>
-    const { ipcRenderer } = require('electron');
-
-    const trackTitle = document.getElementById('trackTitle');
-    const trackArtist = document.getElementById('trackArtist');
-    const albumArt = document.getElementById('albumArt');
-    const miniArt = document.getElementById('miniArt');
-    const progress = document.getElementById('timelineProgress');
-    const timeCurrent = document.getElementById('timeCurrent');
-    const timeRemaining = document.getElementById('timeRemaining');
-
-    document.getElementById('btnPrev').addEventListener('click', () => {
-      ipcRenderer.send('music-control', 'prev');
-    });
-
-    document.getElementById('btnPlayPause').addEventListener('click', () => {
-      ipcRenderer.send('music-control', 'playpause');
-    });
-
-    document.getElementById('btnNext').addEventListener('click', () => {
-      ipcRenderer.send('music-control', 'next');
-    });
-
-    function formatTime(seconds) {
-      if (!seconds || isNaN(seconds)) return '0:00';
-      const mins = Math.floor(seconds / 60);
-      const secs = Math.floor(seconds % 60);
-      return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-    }
-
-    ipcRenderer.on('music-update', (event, data) => {
-      if (!data.playing) return;
-
-      trackTitle.textContent = data.title;
-      trackArtist.textContent = data.artist;
-
-      if (data.duration > 0) {
-        const percent = (data.position / data.duration) * 100;
-        progress.style.width = `${percent}%`;
-        timeCurrent.textContent = formatTime(data.position);
-        timeRemaining.textContent = `-${formatTime(data.duration - data.position)}`;
-      }
-    });
-
-    ipcRenderer.on('music-art-ready', () => {
-      const artUrl = `file:///tmp/notch_cover.png?${new Date().getTime()}`;
-      albumArt.style.backgroundImage = `url('${artUrl}')`;
-      miniArt.style.backgroundImage = `url('${artUrl}')`;
-    });
-  </script>
+  <script src="script.js"></script>
 </body>
-</html>
+</html> 
