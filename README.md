@@ -3,14 +3,16 @@
 A simple macOS app that turns your MacBook notch into a smart Dynamic Island for Apple Music, just like on the iPhone.
 
 <div align="center">
-  <img src="" alt="Blackhole Notch Preview" width="700">
+  <img src="https://github.com/user-attachments/assets/3afa2f1d-15e7-4ef2-b145-7817afe7c80b" alt="Blackhole Notch Preview" width="700" style="border-radius: 10px;" />
 </div>
+
+
 
 ## Why I made this
 
 There are already a few apps like this out there, but honestly, I got pretty annoyed with them. Most ask for a paid subscription or spam you with ads just to use basic controls. 
 
-So I built my own version — totally free, clean, and made just for people to use without any paywalls.
+So I built my own version totally free, clean, and made just for people to use without any paywalls.
 
 ## Features
 
