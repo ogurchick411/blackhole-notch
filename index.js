@@ -92,6 +92,14 @@ function startMusicTicker() {
             end tell
         end if
 
+        if activeApp is "" and processList contains "YouTube Music" then
+            tell application "YouTube Music"
+                try
+                    if player state is playing or player state is paused then set activeApp to "YouTube Music"
+                end try
+            end tell
+        end if
+
         if activeApp is "Music" then
             tell application "Music"
                 set playerState to player state
@@ -151,6 +159,18 @@ function startMusicTicker() {
                 set stateStr to "PLAYING"
                 if playerState is paused then set stateStr to "PAUSED"
                 return trackName & "|||" & trackArtist & "|||" & stateStr & "|||" & trackBPM & "|||" & trackGenre & "|||" & curPos & "|||" & totalDur & "|||" & hasArt & "|||Spotify"
+            end tell
+        else if activeApp is "YouTube Music" then
+            tell application "YouTube Music"
+                set playerState to player state
+                set trackName to name of current track
+                set trackArtist to artist of current track
+                set curPos to player position
+                set totalDur to duration of current track
+                
+                set stateStr to "PLAYING"
+                if playerState is paused then set stateStr to "PAUSED"
+                return trackName & "|||" & trackArtist & "|||" & stateStr & "|||0|||Unknown|||" & curPos & "|||" & totalDur & "|||false|||YouTube Music"
             end tell
         else
             return "NOT_RUNNING"
@@ -248,6 +268,8 @@ ipcMain.on('music-control', (event, action) => {
                 tell application "Spotify" to ${cmd}
             else if processList contains "Music" then
                 tell application "Music" to ${cmd}
+            else if processList contains "YouTube Music" then
+                tell application "YouTube Music" to ${cmd}
             end if
         `;
         exec(`osascript -e '${script}'`);
@@ -261,6 +283,8 @@ ipcMain.on('music-seek', (event, seekTime) => {
             tell application "Spotify" to set player position to ${seekTime}
         else if processList contains "Music" then
             tell application "Music" to set player position to ${seekTime}
+        else if processList contains "YouTube Music" then
+            tell application "YouTube Music" to set player position to ${seekTime}
         end if
     `;
     exec(`osascript -e '${script}'`);
