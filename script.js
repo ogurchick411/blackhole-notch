@@ -1,315 +1,316 @@
-    const { ipcRenderer } = require('electron');
-    const island = document.getElementById('island');
-    const miniArt = document.getElementById('miniArt');
-    const albumArt = document.getElementById('albumArt');
-    const playPauseIcon = document.getElementById('playPauseIcon');
-    const fullBars = document.querySelectorAll('.main-eq .bar');
-    const miniBars = document.querySelectorAll('.mini-eq .bar');
+const { ipcRenderer } = require('electron');
+const island = document.getElementById('island');
+const miniArt = document.getElementById('miniArt');
+const albumArt = document.getElementById('albumArt');
+const playPauseIcon = document.getElementById('playPauseIcon');
+const fullBars = document.querySelectorAll('.main-eq .bar');
+const miniBars = document.querySelectorAll('.mini-eq .bar');
 
-    const timelineContainer = document.getElementById('timelineContainer');
-    const timelineBarWrapper = document.getElementById('timelineBarWrapper');
-    const timelineProgress = document.getElementById('timelineProgress');
-    const timelineHandle = document.getElementById('timelineHandle');
-    const timeCurrent = document.getElementById('timeCurrent');
-    const timeRemaining = document.getElementById('timeRemaining');
+const timelineContainer = document.getElementById('timelineContainer');
+const timelineBarWrapper = document.getElementById('timelineBarWrapper');
+const timelineProgress = document.getElementById('timelineProgress');
+const timelineHandle = document.getElementById('timelineHandle');
+const timeCurrent = document.getElementById('timeCurrent');
+const timeRemaining = document.getElementById('timeRemaining');
 
-    let isAnimating = false;
-    let hasMusic = false;
-    let currentStatus = 'PAUSED';
-    let currentSpeedDivider = 200; 
+let isAnimating = false;
+let hasMusic = false;
+let currentStatus = 'PAUSED';
+let currentSpeedDivider = 200; 
 
-    let trackPosition = 0;
-    let trackDuration = 0;
-    let lastUpdateTimestamp = 0;
-    let smoothTimelineInterval = null;
-    let isDragging = false;
-    let lavaRaf = null;
+let trackPosition = 0;
+let trackDuration = 0;
+let lastUpdateTimestamp = 0;
+let smoothTimelineInterval = null;
+let isDragging = false;
+let lavaRaf = null;
 
-    let fullHeights = [3, 3, 3, 3];
-    let miniHeights = [3, 3, 3, 3];
-    let targetFull = [3, 3, 3, 3];
-    let targetMini = [3, 3, 3, 3];
+let fullHeights = [3, 3, 3, 3];
+let miniHeights = [3, 3, 3, 3];
+let targetFull = [3, 3, 3, 3];
+let targetMini = [3, 3, 3, 3];
 
-    let savedTrackData = null; 
+let savedTrackData = null; 
 
-    const themes = {
-        'spotify-green':    { start: '#1db954', end: '#1ed760', glow1: '#073b18', glow2: '#021a0a' },
-        'cyber-violet':     { start: '#a855f7', end: '#c084fc', glow1: '#2e1065', glow2: '#0f172a' },
-        'vampire-blood':    { start: '#dc2626', end: '#ef4444', glow1: '#450a0a', glow2: '#000000' },
-        'monochrome-noir':  { start: '#ffffff', end: '#e2e8f0', glow1: '#1e293b', glow2: '#0f172a' },
-        'aurora-borealis':  { start: '#06b6d4', end: '#22d3ee', glow1: '#042f2e', glow2: '#0f172a' }
-    };
+const themes = {
+    'spotify-green':    { start: '#1db954', end: '#1ed760', glow1: '#073b18', glow2: '#021a0a' },
+    'cyber-violet':     { start: '#a855f7', end: '#c084fc', glow1: '#2e1065', glow2: '#0f172a' },
+    'vampire-blood':    { start: '#dc2626', end: '#ef4444', glow1: '#450a0a', glow2: '#000000' },
+    'monochrome-noir':  { start: '#ffffff', end: '#e2e8f0', glow1: '#1e293b', glow2: '#0f172a' },
+    'aurora-borealis':  { start: '#06b6d4', end: '#22d3ee', glow1: '#042f2e', glow2: '#0f172a' }
+};
 
-    function formatTime(seconds) {
-        if (!seconds || isNaN(seconds) || seconds < 0) return "0:00";
-        const mins = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-        return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+document.addEventListener('DOMContentLoaded', () => {
+    const savedStart = localStorage.getItem('accent-start');
+    const savedEnd = localStorage.getItem('accent-end');
+    const savedGlow1 = localStorage.getItem('glow-1');
+    const savedGlow2 = localStorage.getItem('glow-2');
+
+    if (savedStart && savedEnd) {
+        const root = document.documentElement;
+        root.style.setProperty('--accent-start', savedStart);
+        root.style.setProperty('--accent-end', savedEnd);
+        if (savedGlow1) root.style.setProperty('--glow-1', savedGlow1);
+        if (savedGlow2) root.style.setProperty('--glow-2', savedGlow2);
     }
+});
 
-    function updateTargets() {
-        if (currentStatus !== 'PLAYING') {
-            targetFull = [3, 3, 3, 3];
-            targetMini = [3, 3, 3, 3];
-            return;
-        }
-        const basesFull = [12, 15, 10, 14];
-        const basesMini = [8, 10, 7, 9];
-        for (let i = 0; i < 4; i++) {
-            if (Math.random() > 0.4) targetFull[i] = Math.floor(Math.random() * basesFull[i]) + 3;
-            if (Math.random() > 0.4) targetMini[i] = Math.floor(Math.random() * basesMini[i]) + 3;
-        }
+function formatTime(seconds) {
+    if (!seconds || isNaN(seconds) || seconds < 0) return "0:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+}
+
+function updateTargets() {
+    if (currentStatus !== 'PLAYING') {
+        targetFull = [3, 3, 3, 3];
+        targetMini = [3, 3, 3, 3];
+        return;
     }
+    const basesFull = [12, 15, 10, 14];
+    const basesMini = [8, 10, 7, 9];
+    for (let i = 0; i < 4; i++) {
+        if (Math.random() > 0.4) targetFull[i] = Math.floor(Math.random() * basesFull[i]) + 3;
+        if (Math.random() > 0.4) targetMini[i] = Math.floor(Math.random() * basesMini[i]) + 3;
+    }
+}
 
-    setInterval(updateTargets, 80);
+setInterval(updateTargets, 80);
 
-    function animateLavaGlow() {
-        if (currentStatus !== 'PLAYING' || !island.classList.contains('expanded')) {
-            island.style.removeProperty('--x');
-            island.style.removeProperty('--y');
-            lavaRaf = null;
-            return;
-        }
-        const t = Date.now() * 0.0008; 
-        const x = 50 + Math.sin(t) * 35 + Math.cos(t * 0.6) * 10;
-        const y = 50 + Math.cos(t * 0.8) * 35 + Math.sin(t * 0.5) * 10;
-        island.style.setProperty('--x', `${x}%`);
-        island.style.setProperty('--y', `${y}%`);
+function animateLavaGlow() {
+    if (currentStatus !== 'PLAYING' || !island.classList.contains('expanded')) {
+        island.style.removeProperty('--x');
+        island.style.removeProperty('--y');
+        lavaRaf = null;
+        return;
+    }
+    const t = Date.now() * 0.0008; 
+    const x = 50 + Math.sin(t) * 35 + Math.cos(t * 0.6) * 10;
+    const y = 50 + Math.cos(t * 0.8) * 35 + Math.sin(t * 0.5) * 10;
+    island.style.setProperty('--x', `${x}%`);
+    island.style.setProperty('--y', `${y}%`);
+    lavaRaf = requestAnimationFrame(animateLavaGlow);
+}
+
+function startLavaAnimation() {
+    if (!lavaRaf && currentStatus === 'PLAYING' && island.classList.contains('expanded')) {
         lavaRaf = requestAnimationFrame(animateLavaGlow);
     }
+}
 
-    function startLavaAnimation() {
-        if (!lavaRaf && currentStatus === 'PLAYING' && island.classList.contains('expanded')) {
-            lavaRaf = requestAnimationFrame(animateLavaGlow);
-        }
-    }
-
-    function renderEqualizer() {
-        let hasMovement = false;
-        fullBars.forEach((bar, i) => {
-            const speedFactor = Date.now() / currentSpeedDivider;
-            const base = [12, 15, 10, 14][i];
-            const liveTarget = currentStatus === 'PLAYING' ? Math.sin(speedFactor + i) * (base / 2) + (base / 2) + 3 : 3;
-            const mixedTarget = currentStatus === 'PLAYING' ? (targetFull[i] + liveTarget) / 2 : 3;
-            fullHeights[i] += (mixedTarget - fullHeights[i]) * 0.12;
-            bar.style.height = `${fullHeights[i]}px`;
-            if (Math.abs(mixedTarget - fullHeights[i]) > 0.1) hasMovement = true;
-        });
-        miniBars.forEach((bar, i) => {
-            const speedFactor = Date.now() / (currentSpeedDivider * 0.75);
-            const base = [8, 10, 7, 9][i];
-            const liveTarget = currentStatus === 'PLAYING' ? Math.sin(speedFactor + i) * (base / 2) + (base / 2) + 3 : 3;
-            const mixedTarget = currentStatus === 'PLAYING' ? (targetMini[i] + liveTarget) / 2 : 3;
-            miniHeights[i] += (mixedTarget - miniHeights[i]) * 0.12;
-            bar.style.height = `${miniHeights[i]}px`;
-            if (Math.abs(mixedTarget - miniHeights[i]) > 0.1) hasMovement = true;
-        });
-        if (currentStatus === 'PLAYING' || hasMovement) {
-            requestAnimationFrame(renderEqualizer);
-        } else {
-            isAnimating = false;
-        }
-    }
-
-    function startEqualizerAnimation() {
-        if (!isAnimating && currentStatus === 'PLAYING') {
-            isAnimating = true;
-            renderEqualizer();
-        }
-    }
-
-    function startSmoothTimeline() {
-        if (smoothTimelineInterval) clearInterval(smoothTimelineInterval);
-        smoothTimelineInterval = setInterval(() => {
-            if (currentStatus !== 'PLAYING' || trackDuration <= 0 || isDragging) return;
-            const elapsed = (Date.now() - lastUpdateTimestamp) / 1000;
-            const currentSmoothPos = Math.min(trackPosition + elapsed, trackDuration);
-            const progressPercent = (currentSmoothPos / trackDuration) * 100;
-            timelineProgress.style.width = `${progressPercent}%`;
-            timelineHandle.style.left = `${progressPercent}%`;
-            timeCurrent.innerText = formatTime(currentSmoothPos);
-            timeRemaining.innerText = `-${formatTime(trackDuration - currentSmoothPos)}`;
-        }, 33); 
-    }
-
-    function applyPresetTheme(themeName) {
-        const theme = themes[themeName];
-        if (!theme) return;
-        const root = document.documentElement;
-        root.style.setProperty('--accent-start', theme.start);
-        root.style.setProperty('--accent-end', theme.end);
-        root.style.setProperty('--glow-1', theme.glow1);
-        root.style.setProperty('--glow-2', theme.glow2);
-    }
-
-    island.addEventListener('mouseenter', () => {
-        ipcRenderer.send('set-ignore-mouse-events', false);
-
-        if ((hasMusic || savedTrackData) && !island.classList.contains('expanded')) {
-            ipcRenderer.send('resize-window', 540, 142); 
-            island.classList.add('expanded');
-            startLavaAnimation();
-        }
+function renderEqualizer() {
+    let hasMovement = false;
+    fullBars.forEach((bar, i) => {
+        const speedFactor = Date.now() / currentSpeedDivider;
+        const base = [12, 15, 10, 14][i];
+        const liveTarget = currentStatus === 'PLAYING' ? Math.sin(speedFactor + i) * (base / 2) + (base / 2) + 3 : 3;
+        const mixedTarget = currentStatus === 'PLAYING' ? (targetFull[i] + liveTarget) / 2 : 3;
+        fullHeights[i] += (mixedTarget - fullHeights[i]) * 0.12;
+        bar.style.height = `${fullHeights[i]}px`;
+        if (Math.abs(mixedTarget - fullHeights[i]) > 0.1) hasMovement = true;
     });
-
-    island.addEventListener('mouseleave', () => {
-        if (island.classList.contains('expanded') && !isDragging) {
-            island.classList.remove('expanded');
-            if (lavaRaf) {
-                cancelAnimationFrame(lavaRaf);
-                lavaRaf = null;
-            }
-            island.style.removeProperty('--x');
-            island.style.removeProperty('--y');
-            
-            const defaultWidth = (hasMusic || savedTrackData) ? 270 : 180;
-            ipcRenderer.send('resize-window', defaultWidth, 32);
-            
-            if (!hasMusic && !savedTrackData) {
-                ipcRenderer.send('set-ignore-mouse-events', true, { forward: true });
-            }
-        }
+    miniBars.forEach((bar, i) => {
+        const speedFactor = Date.now() / (currentSpeedDivider * 0.75);
+        const base = [8, 10, 7, 9][i];
+        const liveTarget = currentStatus === 'PLAYING' ? Math.sin(speedFactor + i) * (base / 2) + (base / 2) + 3 : 3;
+        const mixedTarget = currentStatus === 'PLAYING' ? (targetMini[i] + liveTarget) / 2 : 3;
+        miniHeights[i] += (mixedTarget - miniHeights[i]) * 0.12;
+        bar.style.height = `${miniHeights[i]}px`;
+        if (Math.abs(mixedTarget - miniHeights[i]) > 0.1) hasMovement = true;
     });
+    if (currentStatus === 'PLAYING' || hasMovement) {
+        requestAnimationFrame(renderEqualizer);
+    } else {
+        isAnimating = false;
+    }
+}
 
-    function handleTimelineMove(e) {
-        if ((!hasMusic && !savedTrackData) || trackDuration <= 0) return;
-        const bar = document.querySelector('.timeline-bar');
-        const barRect = bar.getBoundingClientRect();
-        const clickX = e.clientX - barRect.left;
-        const percent = Math.max(0, Math.min(1, clickX / barRect.width));
+function startEqualizerAnimation() {
+    if (!isAnimating && currentStatus === 'PLAYING') {
+        isAnimating = true;
+        renderEqualizer();
+    }
+}
+
+function startSmoothTimeline() {
+    if (smoothTimelineInterval) clearInterval(smoothTimelineInterval);
+    smoothTimelineInterval = setInterval(() => {
+        if (currentStatus !== 'PLAYING' || trackDuration <= 0 || isDragging) return;
+        const elapsed = (Date.now() - lastUpdateTimestamp) / 1000;
+        const currentSmoothPos = Math.min(trackPosition + elapsed, trackDuration);
+        const progressPercent = (currentSmoothPos / trackDuration) * 100;
+        timelineProgress.style.width = `${progressPercent}%`;
+        timelineHandle.style.left = `${progressPercent}%`;
+        timeCurrent.innerText = formatTime(currentSmoothPos);
+        timeRemaining.innerText = `-${formatTime(trackDuration - currentSmoothPos)}`;
+    }, 33); 
+}
+
+function applyPresetTheme(themeName) {
+    const theme = themes[themeName];
+    if (!theme) return;
+    const root = document.documentElement;
+    root.style.setProperty('--accent-start', theme.start);
+    root.style.setProperty('--accent-end', theme.end);
+    root.style.setProperty('--glow-1', theme.glow1);
+    root.style.setProperty('--glow-2', theme.glow2);
+
+    localStorage.setItem('accent-start', theme.start);
+    localStorage.setItem('accent-end', theme.end);
+    localStorage.setItem('glow-1', theme.glow1);
+    localStorage.setItem('glow-2', theme.glow2);
+}
+
+island.addEventListener('mouseenter', () => {
+    ipcRenderer.send('set-ignore-mouse-events', false);
+
+    if ((hasMusic || savedTrackData) && !island.classList.contains('expanded')) {
+        ipcRenderer.send('resize-window', 540, 142); 
+        island.classList.add('expanded');
+        startLavaAnimation();
+    }
+});
+
+island.addEventListener('mouseleave', () => {
+    if (island.classList.contains('expanded') && !isDragging) {
+        island.classList.remove('expanded');
+        if (lavaRaf) {
+            cancelAnimationFrame(lavaRaf);
+            lavaRaf = null;
+        }
+        island.style.removeProperty('--x');
+        island.style.removeProperty('--y');
         
-        timelineProgress.style.width = `${percent * 100}%`;
-        timelineHandle.style.left = `${percent * 100}%`;
+        const defaultWidth = (hasMusic || savedTrackData) ? 270 : 180;
+        ipcRenderer.send('resize-window', defaultWidth, 32);
         
-        const calculatedTime = trackDuration * percent;
-        timeCurrent.innerText = formatTime(calculatedTime);
-        timeRemaining.innerText = `-${formatTime(trackDuration - calculatedTime)}`;
-        return calculatedTime;
-    }
-
-    timelineBarWrapper.addEventListener('mousedown', (e) => {
-        isDragging = true;
-        timelineContainer.classList.add('dragging');
-        const targetTime = handleTimelineMove(e);
-        
-        function onMouseMove(moveEvent) { handleTimelineMove(moveEvent); }
-        function onMouseUp(upEvent) {
-            isDragging = false;
-            timelineContainer.classList.remove('dragging');
-            const finalTime = handleTimelineMove(upEvent);
-            ipcRenderer.send('music-seek', finalTime);
-            trackPosition = finalTime;
-            lastUpdateTimestamp = Date.now();
-            window.removeEventListener('mousemove', onMouseMove);
-            window.removeEventListener('mouseup', onMouseUp);
+        if (!hasMusic && !savedTrackData) {
+            ipcRenderer.send('set-ignore-mouse-events', true, { forward: true });
         }
-        window.addEventListener('mousemove', onMouseMove);
-        window.addEventListener('mouseup', onMouseUp);
-    });
+    }
+});
 
-    albumArt.addEventListener('click', () => { 
-        const themeKeys = Object.keys(themes);
-        const currentStart = document.documentElement.style.getPropertyValue('--accent-start').trim() || '#1db954';
-        let currentKeyIndex = themeKeys.findIndex(key => themes[key].start === currentStart);
-        let nextIndex = (currentKeyIndex + 1) % themeKeys.length;
-        applyPresetTheme(themeKeys[nextIndex]);
-        
-        ipcRenderer.send('open-apple-music'); 
-    });
+function handleTimelineMove(e) {
+    if ((!hasMusic && !savedTrackData) || trackDuration <= 0) return;
+    const bar = document.querySelector('.timeline-bar');
+    const barRect = bar.getBoundingClientRect();
+    const clickX = e.clientX - barRect.left;
+    const percent = Math.max(0, Math.min(1, clickX / barRect.width));
+    
+    timelineProgress.style.width = `${percent * 100}%`;
+    timelineHandle.style.left = `${percent * 100}%`;
+    
+    const calculatedTime = trackDuration * percent;
+    timeCurrent.innerText = formatTime(calculatedTime);
+    timeRemaining.innerText = `-${formatTime(trackDuration - calculatedTime)}`;
+    return calculatedTime;
+}
 
-    document.getElementById('btnPlayPause').addEventListener('click', () => {
-        ipcRenderer.send('music-control', 'playpause');
-    });
+timelineBarWrapper.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    timelineContainer.classList.add('dragging');
+    const targetTime = handleTimelineMove(e);
+    
+    function onMouseMove(moveEvent) { handleTimelineMove(moveEvent); }
+    function onMouseUp(upEvent) {
+        isDragging = false;
+        timelineContainer.classList.remove('dragging');
+        const finalTime = handleTimelineMove(upEvent);
+        ipcRenderer.send('music-seek', finalTime);
+        trackPosition = finalTime;
+        lastUpdateTimestamp = Date.now();
+        window.removeEventListener('mousemove', onMouseMove);
+        window.removeEventListener('mouseup', onMouseUp);
+    }
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+});
 
-    document.getElementById('btnNext').addEventListener('click', () => { ipcRenderer.send('music-control', 'next'); });
-    document.getElementById('btnPrev').addEventListener('click', () => { ipcRenderer.send('music-control', 'prev'); });
+albumArt.addEventListener('click', () => { 
+    const themeKeys = Object.keys(themes);
+    const currentStart = document.documentElement.style.getPropertyValue('--accent-start').trim() || '#1db954';
+    let currentKeyIndex = themeKeys.findIndex(key => themes[key].start === currentStart);
+    let nextIndex = (currentKeyIndex + 1) % themeKeys.length;
+    applyPresetTheme(themeKeys[nextIndex]);
 
-    ipcRenderer.on('music-track-changing', () => {
-        miniArt.classList.remove('loaded');
-        albumArt.classList.remove('loaded');
-        miniArt.style.backgroundImage = 'none';
-        albumArt.style.backgroundImage = 'none';
-    });
+    ipcRenderer.send('open-apple-music'); 
+});
 
-    ipcRenderer.on('music-art-ready', () => {
-        const freshCover = `file:///tmp/notch_cover.png?t=${Date.now()}`;
-        const imgLoader = new Image();
-        imgLoader.src = freshCover;
-        imgLoader.onload = () => {
-            miniArt.style.backgroundImage = `url('${freshCover}')`;
-            albumArt.style.backgroundImage = `url('${freshCover}')`;
-            miniArt.classList.add('loaded');
-            albumArt.classList.add('loaded');
+document.getElementById('btnPlayPause').addEventListener('click', () => {
+    ipcRenderer.send('music-control', 'playpause');
+});
+
+document.getElementById('btnNext').addEventListener('click', () => { ipcRenderer.send('music-control', 'next'); });
+document.getElementById('btnPrev').addEventListener('click', () => { ipcRenderer.send('music-control', 'prev'); });
+
+ipcRenderer.on('music-track-changing', () => {
+    miniArt.classList.remove('loaded');
+    albumArt.classList.remove('loaded');
+    miniArt.style.backgroundImage = 'none';
+    albumArt.style.backgroundImage = 'none';
+});
+
+ipcRenderer.on('music-art-ready', () => {
+    const freshCover = `file:///tmp/notch_cover.png?t=${Date.now()}`;
+    const imgLoader = new Image();
+    imgLoader.src = freshCover;
+    imgLoader.onload = () => {
+        miniArt.style.backgroundImage = `url('${freshCover}')`;
+        albumArt.style.backgroundImage = `url('${freshCover}')`;
+        miniArt.classList.add('loaded');
+        albumArt.classList.add('loaded');
+    };
+});
+
+ipcRenderer.on('change-theme', (event, themeName) => {
+    applyPresetTheme(themeName);
+});
+
+ipcRenderer.on('music-update', (event, data) => {
+    const titleEl = document.getElementById('trackTitle');
+    const artistEl = document.getElementById('trackArtist');
+
+    if (data.playing) {
+        hasMusic = true;
+        savedTrackData = {
+            title: data.title,
+            artist: data.artist,
+            position: data.position,
+            duration: data.duration,
+            bpm: data.bpm,
+            status: data.status
         };
-    });
 
-    ipcRenderer.on('change-theme', (event, themeName) => {
-        applyPresetTheme(themeName);
-    });
-
-    ipcRenderer.on('music-update', (event, data) => {
-        const titleEl = document.getElementById('trackTitle');
-        const artistEl = document.getElementById('trackArtist');
-
-        if (data.playing) {
-            hasMusic = true;
-            savedTrackData = {
-                title: data.title,
-                artist: data.artist,
-                position: data.position,
-                duration: data.duration,
-                bpm: data.bpm,
-                status: data.status
-            };
-
-            titleEl.innerText = data.title;
-            artistEl.innerText = data.artist;
-            island.classList.add('music-active');
-            
-            if (data.bpm && data.bpm > 0) {
-                currentSpeedDivider = Math.max(100, 300 - data.bpm);
-            } else {
-                currentSpeedDivider = 200;
-            }
-
-            if (!isDragging) {
-                trackPosition = data.position;
-                trackDuration = data.duration;
-                lastUpdateTimestamp = Date.now();
-            }
-
-            if (!island.classList.contains('expanded')) {
-                ipcRenderer.send('resize-window', 270, 32);
-            }
-            
-            currentStatus = data.status;
-            if (data.status === 'PLAYING') {
-                playPauseIcon.className = 'icon-pause';
-                island.classList.add('playing');
-                startEqualizerAnimation();
-                startSmoothTimeline();
-                startLavaAnimation();
-            } else {
-                playPauseIcon.className = 'icon-play';
-                island.classList.remove('playing');
-                if (smoothTimelineInterval) clearInterval(smoothTimelineInterval);
-                if (lavaRaf) {
-                    cancelAnimationFrame(lavaRaf);
-                    lavaRaf = null;
-                }
-                
-                if (!isDragging) {
-                    trackPosition = data.position; 
-                    lastUpdateTimestamp = Date.now();
-                    const progressPercent = (trackPosition / trackDuration) * 100;
-                    timelineProgress.style.width = `${progressPercent}%`;
-                    timelineHandle.style.left = `${progressPercent}%`;
-                    timeCurrent.innerText = formatTime(trackPosition);
-                    timeRemaining.innerText = `-${formatTime(trackDuration - trackPosition)}`;
-                }
-            }
+        titleEl.innerText = data.title;
+        artistEl.innerText = data.artist;
+        island.classList.add('music-active');
+        
+        if (data.bpm && data.bpm > 0) {
+            currentSpeedDivider = Math.max(100, 300 - data.bpm);
         } else {
-            hasMusic = false;
+            currentSpeedDivider = 200;
+        }
+
+        if (!isDragging) {
+            trackPosition = data.position;
+            trackDuration = data.duration;
+            lastUpdateTimestamp = Date.now();
+        }
+
+        if (!island.classList.contains('expanded')) {
+            ipcRenderer.send('resize-window', 270, 32);
+        }
+        
+        currentStatus = data.status;
+        if (data.status === 'PLAYING') {
+            playPauseIcon.className = 'icon-pause';
+            island.classList.add('playing');
+            startEqualizerAnimation();
+            startSmoothTimeline();
+            startLavaAnimation();
+        } else {
+            playPauseIcon.className = 'icon-play';
             island.classList.remove('playing');
             if (smoothTimelineInterval) clearInterval(smoothTimelineInterval);
             if (lavaRaf) {
@@ -317,32 +318,51 @@
                 lavaRaf = null;
             }
             
-            playPauseIcon.className = 'icon-play';
-            currentStatus = 'PAUSED';
-
-            if (savedTrackData) {
-                titleEl.innerText = savedTrackData.title;
-                artistEl.innerText = savedTrackData.artist;
-                trackPosition = savedTrackData.position;
-                trackDuration = savedTrackData.duration;
-                
+            if (!isDragging) {
+                trackPosition = data.position; 
+                lastUpdateTimestamp = Date.now();
                 const progressPercent = (trackPosition / trackDuration) * 100;
                 timelineProgress.style.width = `${progressPercent}%`;
                 timelineHandle.style.left = `${progressPercent}%`;
                 timeCurrent.innerText = formatTime(trackPosition);
                 timeRemaining.innerText = `-${formatTime(trackDuration - trackPosition)}`;
-            } else {
-                titleEl.innerText = "Nothing Playing";
-                artistEl.innerText = "Start playing music";
-                timelineProgress.style.width = '0%';
-                timelineHandle.style.left = '0%';
-                timeCurrent.innerText = "0:00";
-                timeRemaining.innerText = "-0:00";
-            }
-
-            if (!island.classList.contains('expanded')) {
-                island.classList.remove('music-active');
-                ipcRenderer.send('resize-window', 180, 32); 
             }
         }
-    });
+    } else {
+        hasMusic = false;
+        island.classList.remove('playing');
+        if (smoothTimelineInterval) clearInterval(smoothTimelineInterval);
+        if (lavaRaf) {
+            cancelAnimationFrame(lavaRaf);
+            lavaRaf = null;
+        }
+        
+        playPauseIcon.className = 'icon-play';
+        currentStatus = 'PAUSED';
+
+        if (savedTrackData) {
+            titleEl.innerText = savedTrackData.title;
+            artistEl.innerText = savedTrackData.artist;
+            trackPosition = savedTrackData.position;
+            trackDuration = savedTrackData.duration;
+            
+            const progressPercent = (trackPosition / trackDuration) * 100;
+            timelineProgress.style.width = `${progressPercent}%`;
+            timelineHandle.style.left = `${progressPercent}%`;
+            timeCurrent.innerText = formatTime(trackPosition);
+            timeRemaining.innerText = `-${formatTime(trackDuration - trackPosition)}`;
+        } else {
+            titleEl.innerText = "Nothing Playing";
+            artistEl.innerText = "Start playing music";
+            timelineProgress.style.width = '0%';
+            timelineHandle.style.left = '0%';
+            timeCurrent.innerText = "0:00";
+            timeRemaining.innerText = "-0:00";
+        }
+
+        if (!island.classList.contains('expanded')) {
+            island.classList.remove('music-active');
+            ipcRenderer.send('resize-window', 180, 32); 
+        }
+    }
+});
