@@ -366,3 +366,38 @@ ipcRenderer.on('music-update', (event, data) => {
         }
     }
 });
+
+const dropZone = document.getElementById('dropZone');
+const dropText = document.getElementById('dropText');
+let storedFiles = [];
+
+['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+    window.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+    }, false);
+});
+
+window.addEventListener('dragenter', () => {
+    ipcRenderer.send('resize-window', 540, 142);
+    island.classList.add('expanded', 'shelf-active');
+    dropZone.classList.add('drag-over');
+});
+
+dropZone.addEventListener('dragleave', (e) => {
+    if (e.target === dropZone) {
+        dropZone.classList.remove('drag-over');
+    }
+});
+
+window.addEventListener('drop', (e) => {
+    dropZone.classList.remove('drag-over');
+    const files = e.dataTransfer.files;
+
+    if (files.length > 0) {
+        storedFiles = Array.from(files);
+        const fileName = storedFiles[0].name;
+        dropText.innerText = `Saved: ${fileName}`;
+        console.log('Files stored in Shelf:', storedFiles);
+    }
+});
