@@ -401,3 +401,12 @@ window.addEventListener('drop', (e) => {
         console.log('Files stored in Shelf:', storedFiles);
     }
 });
+
+island.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    island.classList.toggle('shelf-active');
+    if (island.classList.contains('shelf-active')) {
+        ipcRenderer.send('resize-window', 540, 142);
+        island.classList.add('expanded');
+    }
+});
