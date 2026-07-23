@@ -9,7 +9,6 @@
     "pack": "electron-builder --dir",
     "dist": "electron-builder"
   },
-  "dependencies": {},
   "devDependencies": {
     "electron": "^30.0.0",
     "electron-builder": "^24.13.3"
@@ -17,9 +16,7 @@
   "build": {
     "appId": "com.ogurchick.blackhole.notch",
     "files": [
-      "index.html",
-      "index.js",
-      "package.json"
+      "**/*"
     ],
     "mac": {
       "icon": "build/icon.icns",

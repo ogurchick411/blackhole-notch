@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, screen, Tray, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, Tray, Menu, Notification } = require('electron');
 const path = require('path');
 const { exec } = require('child_process');
 const fs = require('fs');
@@ -31,36 +31,74 @@ function createWindow() {
         }
     });
 
-    mainWindow.loadFile('index.html');
+    mainWindow.loadFile(path.join(__dirname, 'index.html'));
     mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
     mainWindow.setIgnoreMouseEvents(false);
+
+  //  mainWindow.webContents.openDevTools({ mode: 'detach' });
+}
+
+function updateTrayMenu(statusText = 'Ready') {
+    if (!tray) return;
+
+    const contextMenu = Menu.buildFromTemplate([
+        { label: 'Blackhole Notch v1.0.0', enabled: false },
+        { label: `Status: ${statusText}`, enabled: false },
+        { type: 'separator' },
+        { 
+            label: 'Themes', 
+            submenu: [
+                { label: 'Spotify Green', click: () => mainWindow && mainWindow.webContents.send('change-theme', 'spotify-green') },
+                { label: 'Cyber Violet', click: () => mainWindow && mainWindow.webContents.send('change-theme', 'cyber-violet') },
+                { label: 'Vampire Blood', click: () => mainWindow && mainWindow.webContents.send('change-theme', 'vampire-blood') },
+                { label: 'Monochrome Noir', click: () => mainWindow && mainWindow.webContents.send('change-theme', 'monochrome-noir') },
+                { label: 'Aurora Borealis', click: () => mainWindow && mainWindow.webContents.send('change-theme', 'aurora-borealis') }
+            ]
+        },
+        { 
+            label: 'Launch at Login', 
+            type: 'checkbox', 
+            checked: app.getLoginItemSettings().openAtLogin,
+            click: (item) => {
+                app.setLoginItemSettings({ openAtLogin: item.checked });
+            }
+        },
+        { type: 'separator' },
+        { label: 'Reload Widget', click: () => { if (mainWindow) mainWindow.reload(); } },
+        { label: 'Quit', click: () => { app.isQuitting = true; app.quit(); } }
+    ]);
+
+    tray.setContextMenu(contextMenu);
 }
 
 function createTray() {
-    let iconPath = path.join(__dirname, 'build', 'icon.png');
-    if (!fs.existsSync(iconPath)) iconPath = path.join(__dirname, 'icon.png');
-    if (!fs.existsSync(iconPath)) return;
-
     try {
-        tray = new Tray(iconPath);
-        const contextMenu = Menu.buildFromTemplate([
-            { label: 'Blackhole Notch v1.0', enabled: false },
-            { type: 'separator' },
-            { label: 'Reload Widget', click: () => { if (mainWindow) mainWindow.reload(); } },
-            { label: 'Quit', click: () => { app.isQuitting = true; app.quit(); } }
-        ]);
-        tray.setToolTip('Blackhole Notch');
-        tray.setContextMenu(contextMenu);
+        let iconPath = path.join(__dirname, 'icon.png');
+        if (!fs.existsSync(iconPath) && process.resourcesPath) {
+            iconPath = path.join(process.resourcesPath, 'icon.png');
+        }
+
+        if (fs.existsSync(iconPath)) {
+            tray = new Tray(iconPath);
+            tray.setToolTip('Blackhole Notch - Active');
+            updateTrayMenu('Waiting for music...');
+        }
     } catch (e) {}
 }
 
-function startMusicTicker() {
-    const getAppleScript = (fetchArt) => `
-        tell application "System Events" to set procList to (name of every process)
+function showStartNotification() {
+    if (Notification.isSupported()) {
+        new Notification({
+            title: 'Blackhole Notch',
+            body: 'Widget is active under your notch!'
+        }).show();
+    }
+}
 
-        -- 1. Apple Music
-        if procList contains "Music" then
+function getAppleScript(fetchArt) {
+    return `
+        if application "Music" is running then
             try
                 tell application "Music"
                     if player state is playing or player state is paused then
@@ -93,8 +131,7 @@ function startMusicTicker() {
             end try
         end if
 
-        -- 2. Spotify
-        if procList contains "Spotify" then
+        if application "Spotify" is running then
             try
                 tell application "Spotify"
                     if player state is playing or player state is paused then
@@ -125,16 +162,19 @@ function startMusicTicker() {
 
         return "NOT_RUNNING"
     `;
+}
 
+function startMusicTicker() {
     setInterval(() => {
         if (!mainWindow || mainWindow.isDestroyed()) return;
 
-        exec(`osascript -e '${getAppleScript(false)}'`, (err, stdout) => {
+        exec(`osascript -e '${getAppleScript(false)}'`, { timeout: 800, killSignal: 'SIGKILL' }, (err, stdout) => {
             if (err || !stdout) return;
             const response = stdout.trim();
             
             if (response === "NOT_RUNNING" || response === "" || response.includes("error")) {
                 mainWindow.webContents.send('music-update', { playing: false, status: 'STOPPED' });
+                updateTrayMenu('No music playing');
                 lastSignature = '';
             } else {
                 const parts = response.split('|||');
@@ -147,8 +187,9 @@ function startMusicTicker() {
                 if (currentSignature !== lastSignature) {
                     lastSignature = currentSignature;
                     mainWindow.webContents.send('music-track-changing');
+                    updateTrayMenu(`Playing: ${title}`);
                     
-                    exec(`osascript -e '${getAppleScript(true)}'`, () => {
+                    exec(`osascript -e '${getAppleScript(true)}'`, { timeout: 1000, killSignal: 'SIGKILL' }, () => {
                         setTimeout(() => {
                             if (!mainWindow || mainWindow.isDestroyed()) return;
                             mainWindow.webContents.send('music-art-ready');
@@ -157,7 +198,7 @@ function startMusicTicker() {
                 }
 
                 mainWindow.webContents.send('music-update', {
-                    playing: true,
+                    playing: parts[2] === 'PLAYING',
                     title: title,
                     artist: artist,
                     status: parts[2] || 'PLAYING',
@@ -176,6 +217,7 @@ app.whenReady().then(() => {
     if (process.platform === 'darwin') app.dock.hide();
     createWindow();
     createTray();
+    showStartNotification();
     startMusicTicker();
 });
 
@@ -193,17 +235,15 @@ ipcMain.on('set-ignore-mouse-events', (event, ignore, options) => {
     mainWindow.setIgnoreMouseEvents(ignore, options);
 });
 
-// Открывает то приложение, которое сейчас играет
 ipcMain.on('open-apple-music', () => {
     const script = `
-        tell application "System Events" to set processList to (name of every process)
-        if processList contains "Spotify" then
+        if application "Spotify" is running then
             tell application "Spotify" to activate
-        else if processList contains "Music" then
+        else if application "Music" is running then
             tell application "Music" to activate
         end if
     `;
-    exec(`osascript -e '${script}'`);
+    exec(`osascript -e '${script}'`, { timeout: 800, killSignal: 'SIGKILL' });
 });
 
 ipcMain.on('music-control', (event, action) => {
@@ -214,25 +254,23 @@ ipcMain.on('music-control', (event, action) => {
     
     if (cmd) {
         const script = `
-            tell application "System Events" to set processList to (name of every process)
-            if processList contains "Spotify" then
+            if application "Spotify" is running then
                 tell application "Spotify" to ${cmd}
-            else if processList contains "Music" then
+            else if application "Music" is running then
                 tell application "Music" to ${cmd}
             end if
         `;
-        exec(`osascript -e '${script}'`);
+        exec(`osascript -e '${script}'`, { timeout: 800, killSignal: 'SIGKILL' });
     }
 });
 
 ipcMain.on('music-seek', (event, seekTime) => {
     const script = `
-        tell application "System Events" to set processList to (name of every process)
-        if processList contains "Spotify" then
+        if application "Spotify" is running then
             tell application "Spotify" to set player position to ${seekTime}
-        else if processList contains "Music" then
+        else if application "Music" is running then
             tell application "Music" to set player position to ${seekTime}
         end if
     `;
-    exec(`osascript -e '${script}'`);
+    exec(`osascript -e '${script}'`, { timeout: 800, killSignal: 'SIGKILL' });
 });
