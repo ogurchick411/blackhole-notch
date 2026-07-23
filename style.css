@@ -312,4 +312,41 @@
       border-radius: 1px;
     }
 
-    
+    .drop-zone {
+      display: none;    
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      border: 2px dashed rgba(255, 255, 255, 0.3);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.05);
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .drop-zone.drag-over {
+      border-color: var(--accent-start, #1db954);
+      background: rgba(255, 255, 255, 0.15);
+      transform: scale(0.98);
+    }
+
+    .drop-icon {
+      font-size: 24px;
+      margin-bottom: 4px;
+    }
+
+    .drop-text {
+      font-size: 11px;
+      color: #a7a7a7;
+      font-weight: 500;
+    }
+
+    .notch.shelf-active .drop-zone {
+      display: flex;
+    }
+
+.notch.shelf-active .player-container {
+  display: none;
+}
