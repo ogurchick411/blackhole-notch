@@ -1,42 +1,52 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <link rel="stylesheet" href="style.css">
-    <meta charset="UTF-8">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blackhole Notch</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-  <div class="notch" id="island">
-    <div class="mini-art" id="miniArt"></div>
+  <div id="island" class="notch">
     
-    <div class="drop-zone" id="dropZone">
-      <div class="drop-icon">📥</div>
-      <div class="drop-text" id="dropText">Drop file here</div>
+    <div id="miniArt" class="mini-art"></div>
+
+    <div class="mini-eq equalizer">
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+    </div>
+
+    <div id="dropZone" class="drop-zone">
+      <span id="dropText" class="drop-text">Drop file here</span>
     </div>
 
     <div class="player-container">
+      
       <div class="top-section">
         <div class="meta-box">
-          <div class="album-art-full" id="albumArt"></div>
+          <div id="albumArt" class="album-art-full"></div>
           <div class="track-info">
-            <div class="track-title" id="trackTitle">Nothing Playing</div>
-            <div class="track-artist" id="trackArtist">Start playing music</div>
+            <div id="trackTitle" class="track-title">Not Playing</div>
+            <div id="trackArtist" class="track-artist">Select a song</div>
           </div>
         </div>
-        
-        <div class="equalizer main-eq">
+
+        <div class="main-eq equalizer">
           <div class="bar"></div>
           <div class="bar"></div>
           <div class="bar"></div>
           <div class="bar"></div>
         </div>
       </div>
-      
-      <div class="timeline-container" id="timelineContainer">
-        <div class="timeline-bar-wrapper" id="timelineBarWrapper">
+
+      <div id="timelineContainer" class="timeline-container">
+        <div id="timelineBarWrapper" class="timeline-bar-wrapper">
           <div class="timeline-bar">
-            <div class="timeline-progress" id="timelineProgress"></div>
-            <div class="timeline-handle" id="timelineHandle"></div>
+            <div id="timelineProgress" class="timeline-progress"></div>
+            <div id="timelineHandle" class="timeline-handle"></div>
           </div>
         </div>
         <div class="time-labels">
@@ -47,20 +57,16 @@
 
       <div class="bottom-section">
         <div class="controls-wrapper">
-          <button class="btn" id="btnPrev"><div class="icon-prev"></div></button>
-          <button class="btn" id="btnPlayPause"><div id="playPauseIcon" class="icon-pause"></div></button>
-          <button class="btn" id="btnNext"><div class="icon-next"></div></button>
+          <button id="btnPrev" class="btn"><div class="icon-prev"></div></button>
+          <button id="btnPlayPause" class="btn"><div id="playPauseIcon" class="icon-play"></div></button>
+          <button id="btnNext" class="btn"><div class="icon-next"></div></button>
         </div>
       </div>
+
     </div>
-    
-    <div class="equalizer mini-eq" id="miniEq">
-      <div class="bar"></div>
-      <div class="bar"></div>
-      <div class="bar"></div>
-      <div class="bar"></div>
-    </div>
+
   </div>
+
   <script src="script.js"></script>
 </body>
 </html>
