@@ -1,7 +1,9 @@
-const { app, BrowserWindow, ipcMain, screen, Tray, Menu, Notification } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, Tray, Menu, Notification, nativeImage } = require('electron');
 const path = require('path');
 const { exec } = require('child_process');
 const fs = require('fs');
+
+process.env['ELECTRON_DISABLE_SECURITY_WARNINGS'] = 'true';
 
 let mainWindow;
 let tray;
@@ -28,15 +30,13 @@ function createWindow() {
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false,
+            webSecurity: false
         }
     });
 
     mainWindow.loadFile(path.join(__dirname, 'index.html'));
     mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
-    mainWindow.setIgnoreMouseEvents(false);
-
-  //  mainWindow.webContents.openDevTools({ mode: 'detach' });
 }
 
 function updateTrayMenu(statusText = 'Ready') {
@@ -228,11 +228,6 @@ ipcMain.on('resize-window', (event, width, height) => {
     const x = Math.floor((screenWidth - width) / 2);
     
     mainWindow.setBounds({ x: x, y: 0, width: width, height: height });
-});
-
-ipcMain.on('set-ignore-mouse-events', (event, ignore, options) => {
-    if (!mainWindow || mainWindow.isDestroyed()) return;
-    mainWindow.setIgnoreMouseEvents(ignore, options);
 });
 
 ipcMain.on('open-apple-music', () => {

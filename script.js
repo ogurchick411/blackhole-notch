@@ -13,9 +13,6 @@ const timelineHandle = document.getElementById('timelineHandle');
 const timeCurrent = document.getElementById('timeCurrent');
 const timeRemaining = document.getElementById('timeRemaining');
 
-const dropZone = document.getElementById('dropZone');
-const dropText = document.getElementById('dropText');
-
 let isAnimating = false;
 let hasMusic = false;
 let currentStatus = 'PAUSED';
@@ -34,7 +31,6 @@ let targetFull = [3, 3, 3, 3];
 let targetMini = [3, 3, 3, 3];
 
 let savedTrackData = null; 
-let storedFiles = [];
 
 const themes = {
     'spotify-green':    { start: '#1db954', end: '#1ed760', glow1: '#073b18', glow2: '#021a0a' },
@@ -166,9 +162,20 @@ function applyPresetTheme(themeName) {
     localStorage.setItem('glow-2', theme.glow2);
 }
 
-island.addEventListener('mouseenter', () => {
-    ipcRenderer.send('set-ignore-mouse-events', false);
+function collapseNotch() {
+    island.classList.remove('expanded');
+    if (lavaRaf) {
+        cancelAnimationFrame(lavaRaf);
+        lavaRaf = null;
+    }
+    island.style.removeProperty('--x');
+    island.style.removeProperty('--y');
+    
+    const defaultWidth = (hasMusic || savedTrackData) ? 270 : 180;
+    ipcRenderer.send('resize-window', defaultWidth, 32);
+}
 
+island.addEventListener('mouseenter', () => {
     if (!island.classList.contains('expanded')) {
         ipcRenderer.send('resize-window', 540, 142); 
         island.classList.add('expanded');
@@ -178,22 +185,7 @@ island.addEventListener('mouseenter', () => {
 
 island.addEventListener('mouseleave', () => {
     if (island.classList.contains('expanded') && !isDragging) {
-        if (island.classList.contains('shelf-active')) return;
-
-        island.classList.remove('expanded');
-        if (lavaRaf) {
-            cancelAnimationFrame(lavaRaf);
-            lavaRaf = null;
-        }
-        island.style.removeProperty('--x');
-        island.style.removeProperty('--y');
-        
-        const defaultWidth = (hasMusic || savedTrackData) ? 270 : 180;
-        ipcRenderer.send('resize-window', defaultWidth, 32);
-        
-        if (!hasMusic && !savedTrackData) {
-            ipcRenderer.send('set-ignore-mouse-events', true, { forward: true });
-        }
+        collapseNotch();
     }
 });
 
@@ -370,47 +362,5 @@ ipcRenderer.on('music-update', (event, data) => {
             island.classList.remove('music-active');
             ipcRenderer.send('resize-window', 180, 32); 
         }
-    }
-});
-
-['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-    window.addEventListener(eventName, (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-    }, false);
-});
-
-window.addEventListener('dragenter', () => {
-    ipcRenderer.send('resize-window', 540, 142);
-    island.classList.add('expanded', 'shelf-active');
-    dropZone.classList.add('drag-over');
-});
-
-dropZone.addEventListener('dragleave', (e) => {
-    if (e.target === dropZone) {
-        dropZone.classList.remove('drag-over');
-    }
-});
-
-window.addEventListener('drop', (e) => {
-    dropZone.classList.remove('drag-over');
-    const files = e.dataTransfer.files;
-
-    if (files.length > 0) {
-        storedFiles = Array.from(files);
-        const fileName = storedFiles[0].name;
-        dropText.innerText = `Saved: ${fileName}`;
-    }
-});
-
-island.addEventListener('contextmenu', (e) => {
-    e.preventDefault();
-    island.classList.toggle('shelf-active');
-    if (island.classList.contains('shelf-active')) {
-        ipcRenderer.send('resize-window', 540, 142);
-        island.classList.add('expanded');
-    } else {
-        island.classList.remove('expanded');
-        ipcRenderer.send('resize-window', 270, 32);
     }
 });
